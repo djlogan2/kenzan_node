@@ -1,0 +1,33 @@
+{
+  "name": "kenzannodetest",
+  "version": "1.0.0",
+  "description": "REST server test program for Kenzan",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djlogan2/kenzan_node.git"
+  },
+  "keywords": [
+    "kenzan",
+    "node",
+    "rest"
+  ],
+  "author": "David Logan",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/djlogan2/kenzan_node/issues"
+  },
+  "homepage": "https://github.com/djlogan2/kenzan_node#readme",
+  "devDependencies": {
+    "nodemon": "^1.12.1"
+  },
+  "dependencies": {
+    "body-parser": "^1.18.2",
+    "express": "^4.16.2",
+    "mongoose": "^4.12.1"
+  }
+}
