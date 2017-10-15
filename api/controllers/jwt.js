@@ -21,27 +21,33 @@ function JWTToken(token_or_employeeRecord) {
                 return;
             }
             tokenArray1[0] = tokenArray1[1];
-            var tokenArray2 = tokenArray1[0].split('.');
-            if (!tokenArray2 || tokenArray2.length !== 3) {
-                this.error = "Invalid token(3)";
-                return;
-            }
-            this.header = JSON.parse(Buffer.from(tokenArray2[0], 'base64'));
-            this.payload = JSON.parse(Buffer.from(tokenArray2[1], 'base64'));
-            this.string_signature = tokenArray2[2];
-            const hash = crypto.createHmac('sha256', "signing key").update(tokenArray2[0] + '.' + tokenArray[1]);
-            if (this.string_signature !== new Buffer(hash, 'base64').toString('ascii')) {
-                this.error = "Invalid signature in token";
-                return;
-            }
         }
 
-        if (!this.header || !this.header.alg || this.header.als !== "HSA256") {
+        var tokenArray2 = tokenArray1[0].split('.');
+        if (!tokenArray2 || tokenArray2.length !== 3) {
+            this.error = "Invalid token(3)";
+            return;
+        }
+
+        this.header = JSON.parse(Buffer.from(tokenArray2[0], 'base64'));
+        this.payload = JSON.parse(Buffer.from(tokenArray2[1], 'base64'));
+        this.string_signature = tokenArray2[2];
+
+        this.payload.exp = new Date(this.payload.exp);
+        this.payload.atIssued = new Date(this.payload.atIssued);
+
+        const calculated_signature = crypto.createHmac('sha256', "signing key").update(tokenArray2[0] + '.' + tokenArray2[1]).digest();
+        if (this.string_signature !== Buffer.from(calculated_signature).toString('base64')) {
+            this.error = "Invalid signature in token";
+            return;
+        }
+
+        if (!this.header || !this.header.alg || this.header.alg !== "HS256") {
             this.error = "Invalid algorithm in token header";
             return;
         }
 
-        if (!this.header.exp) {
+        if (!this.payload.exp) {
             this.error = "Missing expiration in token payload";
             return;
         }
@@ -55,7 +61,7 @@ function JWTToken(token_or_employeeRecord) {
     }
     else // It's an employee record, so we need to create a new token
     {
-        this.header = {alg: "HSA256"};
+        this.header = {alg: "HS256"};
         this.payload = {
             username: token_or_employeeRecord.username,
             iss: "issuer",
@@ -71,25 +77,26 @@ JWTToken.prototype.getToken = function () {
     if(this.token) return this.token;
     this.payload.atIssued = new Date();
     this.payload.exp = new Date(this.payload.atIssued);
-    this.payload.exp.setMinutes(this.payload.exp.getMinutes());
+    this.payload.exp.setMinutes(this.payload.exp.getMinutes() + 60);
 
-    var string_header = new Buffer(this.header, 'base64').toString('ascii');
-    var string_payload = new Buffer(this.payload, 'base64').toString('ascii');
-    const hash = crypto.createHmac('sha256', "signing key").update(string_header + '.' + string_payload);
-    var string_signature = Buffer(hash, 'base64').toString('ascii');
+    var string_header = Buffer.from(JSON.stringify(this.header)).toString('base64');
+    var string_payload = Buffer.from(JSON.stringify(this.payload)).toString('base64');
+    const binary_signature = crypto.createHmac('sha256', 'signing key').update(string_header + '.' + string_payload).digest();
+    var string_signature = Buffer.from(binary_signature).toString('base64');
 
     return "Bearer " + string_header + "." + string_payload + "." + string_signature;
-}
+};
 
 JWTToken.prototype.isValid = function () {
     return this.valid;
-}
+};
+
 JWTToken.prototype.getError = function () {
     return this.error;
-}
+};
 
 JWTToken.prototype.isInRole = function (role) {
-    return (this.valid && payload && payload.roles && payload.roles.indexOf(role) > -1);
-}
+    return (this.valid && this.payload && this.payload.roles && this.payload.roles.indexOf(role) > -1);
+};
 
 module.exports = JWTToken;

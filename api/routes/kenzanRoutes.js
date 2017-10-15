@@ -1,4 +1,4 @@
-'use string';
+'use strict';
 
 module.exports = function(app) {
   var employeeController = require('../controllers/employeeController.js');
