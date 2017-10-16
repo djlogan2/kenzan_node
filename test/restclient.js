@@ -12,22 +12,20 @@ var validParser = {
     parse: function (byteBuffer, nrcEventEmitter, parsedCallback) {
         "use strict";
         var parsedData = null;
-        var returnedData = null;
         try {
-            parsedData = JSON.parse(byteBuffer.toString());
-            returnedData = _.mapObject(parsedData, function(val, key){
-                if(key === "dateOfBirth" || key === "dateOfEmployment")
-                    return new Date(val + " 00:00:00");
-                else
-                    return val;
-            });
-            parsedData.parsed = true;
+            if(byteBuffer.length != 0) {
+                parsedData = JSON.parse(byteBuffer.toString());
+                if("dateOfBirth" in parsedData) parsedData.dateOfBirth = new Date(parsedData.dateOfBirth + " 00:00:00");
+                if("dateOfEmployment" in parsedData) parsedData.dateOfEmployment = new Date(parsedData.dateOfEmployment + " 00:00:00");
+                //parsedData.parsed = true;
+            }
+            //else parsedData = {parsed: true};
 
             // emit custom event
             //nrcEventEmitter('parsed','data has been parsed ' + parsedData);
 
             // pass parsed data to client request method callback
-            parsedCallback(returnedData);
+            parsedCallback(parsedData);
         } catch (err) {
             nrcEventEmitter('error', err);
         }

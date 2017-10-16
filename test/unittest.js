@@ -7,6 +7,19 @@ var variousUsers = ['kenzan', 'kenzana', 'kenzand', 'kenzanu', 'kenzanad', 'kenz
 
 var testno = 0;
 
+function areEmployeeRecordsEqual(e1, e2) {
+    "use strict";
+    return (
+      e1.username === e2.username &&
+      e1.firstName === e2.firstName &&
+      e1.middleInitial === e2.middleInitial &&
+      e1.lastName === e2.lastName &&
+      e1.bStatus === e2.bStatus &&
+        (e1.dateOfBirth && e2.dateOfBirth && e1.dateOfBirth.getTime() === e2.dateOfBirth.getTime()) &&
+        ((!e1.dateOfEmployment && !e2.dateOfEmployment) || (e1.dateOfEmployment && e2.dateOfEmployment && e1.dateOfEmployment.getTime() === e2.dateOfEmployment.getTime()))
+    );
+}
+
 function newEmployee(prefix) {
     "use strict";
     var emp = {
@@ -212,7 +225,7 @@ describe('Rest server', function () {
                                 assert.notEqual(resp.id, null, 'response id should not be null');
                                 clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
-                                    assert.ok(_.isEqual(employee, updatedRecord), 'returned record should match our updated data');
+                                    assert.ok(areEmployeeRecordsEqual(employee, updatedRecord), 'returned record should match our updated data');
                                     done();
                                 });
                             }
@@ -221,7 +234,7 @@ describe('Rest server', function () {
                                 assert.equal(resp.errorcode, statusCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                                 clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
-                                    assert.ok(_.isEqual(employee, newEmployeeRecord), 'returned record should match the originally added data');
+                                    assert.ok(areEmployeeRecordsEqual(employee, newEmployeeRecord), 'returned record should match the originally added data');
                                     done();
                                 });
                             }
@@ -232,7 +245,44 @@ describe('Rest server', function () {
         });
     });
 
-    describe.skip('Test deletes', function () {
+    describe('Test deletes', function () {
+        variousUsers.forEach(function (user) {
+            var not = '';
+            if (user.indexOf('d', 6) === -1) not = 'not ';
+            it('should ' + not + 'be allowed by user ' + user, function (done) {
+                addNewEmployee('update1', function (newEmployeeRecord) {
+                    "use strict";
+                    console.log('Trying to delete a record as ' + user);
+                    login(user, "kenzan", function (clientuser) {
+                        clientuser.deleteEmployee(newEmployeeRecord.id, function (resp) {
+                            console.dir(resp);
+                            assert.notEqual(resp, null, 'response should not be null');
+                            assert.ok("error" in resp, 'response should have an error field');
+                            assert.ok("errorcode" in resp, 'response should have an error code field');
+                            assert.ok("id" in resp, 'response should have an id field');
+                            if (not === '') {
+                                assert.equal(resp.error, null, 'response error should be null');
+                                assert.equal(resp.errorcode, statusCode.NONE, 'error code should indicate no error');
+                                assert.notEqual(resp.id, null, 'response id should not be null');
+                                clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
+                                    assert.equal(employee, null, 'employee should be null');
+                                    done();
+                                });
+                            }
+                            else {
+                                assert.notEqual(resp.error, null, 'response error should not be null');
+                                assert.equal(resp.errorcode, statusCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
+                                clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
+                                    assert.notEqual(employee, null, 'employee should not be null');
+                                    assert.ok(areEmployeeRecordsEqual(employee, newEmployeeRecord), 'returned record should match the original data');
+                                    done();
+                                });
+                            }
+                        });
+                    });
+                });
+            });
+        });
     });
 
     describe.skip('Test nonexistent updates', function () {
