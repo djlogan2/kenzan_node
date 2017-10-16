@@ -34,35 +34,6 @@ var validParser = {
 
 client.parsers.add(validParser);
 
-/*
-client.serializers.add({
-    "name":"example-serializer",
-    "isDefault":false,
-    "match":function(request){
-        // only match to requests with  a test-header equal to "hello world!"
-        //return request.headers["test-header"]==="hello world!";
-        return true;
-    },
-    "serialize":function(data,nrcEventEmitter,serializedCallback){
-        // serialization process
-        var serializedData = null;
-
-        if (typeof data === 'string'){
-            serializedData = data.concat(" I'm serialized!!");
-        }else if (typeof data === 'object'){
-            serializedData = data;
-            serializedData.state = "serialized"
-            serializedData = JSON.stringify(serializedData);
-        }
-
-        nrcEventEmitter('serialized','data has been serialized ' + serializedData);
-        // pass serialized data to client to be sent to remote API
-        serializedCallback(serializedData);
-
-    }
-
-});
-*/
 function RestClient(url) {
     "use strict";
     this.url = url;

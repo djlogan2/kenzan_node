@@ -2,6 +2,10 @@ var client = require('./restclient');
 var assert = require('assert');
 var statusCode = require('./statuscode');
 var _ = require('underscore');
+var URL = "http://localhost:8080/Kenzan/rest";
+
+var RestClient = require('node-rest-client').Client;
+var restclient = new RestClient();
 
 var variousUsers = ['kenzan', 'kenzana', 'kenzand', 'kenzanu', 'kenzanad', 'kenzanau', 'kenzandu', 'kenzanadu'];
 
@@ -45,7 +49,7 @@ function newEmployee(prefix) {
 function login(username, password, asyncCallback)
 {
     "use strict";
-    var clientuser = new client("http://localhost:8080/Kenzan/rest");
+    var clientuser = new client(URL);
     clientuser.login(username, password, function (resp) {
         assert.notEqual(resp, null, 'response should not be null');
         assert.ok("error" in resp, 'response should have an error field');
@@ -301,14 +305,100 @@ describe('Rest server', function () {
         it('should not allow a set password', function(done){});
     });
 
-    describe.skip('No authorization token', function () {
+    describe('No authorization token', function () {
         "use strict";
-        it('should not allow a get_all', function(done){});
-        it('should not allow a get_emp', function(done){});
-        it('should not allow an add', function(done){});
-        it('should not allow an update', function(done){});
-        it('should not allow a delete', function(done){});
-        it('should not allow a set password', function(done){});
+        it('should not allow a get_all', function(done){
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json" }
+            }, function (data, response) {
+                var resp = JSON.parse(data.toString());
+                assert.notEqual(resp, null, 'Response from service should not be null');
+                assert.ok("error" in resp, 'error field should exist in service response');
+                assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                assert.notEqual(resp.error, null, 'error field should not be null');
+                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, resp.errorcode, 'error code should indicate not authorized');
+                done();
+            });
+        });
+
+        it('should not allow a get_emp', function(done){
+            restclient.get(URL + "/get_emp?id=1", {
+                headers: { "Content-Type": "application/json" }
+            }, function (data, response) {
+                var resp = JSON.parse(data.toString());
+                assert.notEqual(resp, null, 'Response from service should not be null');
+                assert.ok("error" in resp, 'error field should exist in service response');
+                assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                assert.notEqual(resp.error, null, 'error field should not be null');
+                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, resp.errorcode, 'error code should indicate not authorized');
+                done();
+            });
+        });
+
+        it('should not allow an add', function(done){
+            restclient.post(URL + "/add_emp", {
+                headers: {"Content-Type": "application/json", },
+                data: newEmployee("noauth1")
+            }, function (data, response) {
+                var resp = JSON.parse(data.toString());
+                assert.notEqual(resp, null, 'Response from service should not be null');
+                assert.ok("error" in resp, 'error field should exist in service response');
+                assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                assert.notEqual(resp.error, null, 'error field should not be null');
+                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, resp.errorcode, 'error code should indicate not authorized');
+                done();
+            });
+        });
+
+        it('should not allow an update', function(done){
+            "use strict";
+            addNewEmployee("noauth2", function(emp) {
+                restclient.post(URL + "/update_emp", {
+                    headers: {"Content-Type": "application/json"},
+                    data: emp
+                }, function (data, response) {
+                    var resp = JSON.parse(data.toString());
+                    assert.notEqual(resp, null, 'Response from service should not be null');
+                    assert.ok("error" in resp, 'error field should exist in service response');
+                    assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                    assert.notEqual(resp.error, null, 'error field should not be null');
+                    assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, resp.errorcode, 'error code should indicate not authorized');
+                    done();
+                });
+            });
+        });
+
+        it('should not allow a delete', function(done){
+            "use strict";
+            addNewEmployee("noauth3", function(emp) {
+                restclient.get(URL + "/delete_emp?id=" + emp.id, {headers: {"Content-Type": "application/json"}},
+                    function (data, response) {
+                        var resp = JSON.parse(data.toString());
+                        assert.notEqual(resp, null, 'Response from service should not be null');
+                        assert.ok("error" in resp, 'error field should exist in service response');
+                        assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                        assert.notEqual(resp.error, null, 'error field should not be null');
+                        assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, resp.errorcode, 'error code should indicate not authorized');
+                        done();
+                    });
+            });
+        });
+
+        it('should not allow a set password', function(done){
+            "use strict";
+            restclient.post(URL + "/set_password", {
+                data: {username: "kenzan", password: "asdfasdfasdf"},
+                headers: {"Content-Type": "application/json"}
+            }, function (data, response) {
+                var resp = JSON.parse(data.toString());
+                assert.notEqual(resp, null, 'Response from service should not be null');
+                assert.ok("error" in resp, 'error field should exist in service response');
+                assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                assert.notEqual(resp.error, null, 'error field should not be null');
+                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, resp.errorcode, 'error code should indicate not authorized');
+                done();
+            });
+        });
     });
 
     describe.skip('Invalid authorization token', function () {
