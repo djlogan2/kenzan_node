@@ -2,7 +2,11 @@ var client = require('./restclient');
 var assert = require('assert');
 var statusCode = require('./statuscode');
 var _ = require('underscore');
-var URL = "http://localhost:8080/Kenzan/rest";
+var JWT = require('../api/controllers/jwt');
+
+//var URL = "http://localhost:8080/Kenzan/rest";
+//var URL = "http://localhost:3000";
+var URL = "http://192.168.1.101:65376/rest";
 
 var RestClient = require('node-rest-client').Client;
 var restclient = new RestClient();
@@ -68,7 +72,6 @@ function addNewEmployee(prefix, asyncCallback)
     login('kenzanadu', 'kenzan', function(clientuser){
         var emp = newEmployee(prefix);
         clientuser.addEmployee(emp, function(resp){
-            console.dir(resp);
             assert.notEqual(resp, null, 'response should not be null');
             assert.ok("error" in resp, 'response should have an error field');
             assert.ok("errorcode" in resp, 'response should have an error code field');
@@ -89,10 +92,8 @@ describe('Rest server', function () {
             if (user.indexOf('a', 6) === -1) not = 'not ';
             it('should ' + not + 'be allowed by user ' + user, function (done) {
                 "use strict";
-                console.log('Trying to add a record as ' + user);
                 login(user, "kenzan", function (clientuser) {
                     clientuser.addEmployee(newEmployee('add1'), function (resp) {
-                        console.dir(resp);
                         assert.notEqual(resp, null, 'response should not be null');
                         assert.ok("error" in resp, 'response should have an error field');
                         assert.ok("errorcode" in resp, 'response should have an error code field');
@@ -119,7 +120,6 @@ describe('Rest server', function () {
                     var emp = newEmployee("add2");
                     delete emp[key];
                     clientuser.addEmployee(emp, function(resp){
-                        console.dir(resp);
                         assert.notEqual(resp, null, 'response should not be null');
                         assert.ok("error" in resp, 'response should have an error field');
                         assert.ok("errorcode" in resp, 'response should have an error code field');
@@ -209,7 +209,6 @@ describe('Rest server', function () {
             it('should ' + not + 'be allowed by user ' + user, function (done) {
                 addNewEmployee('update1', function (newEmployeeRecord) {
                     "use strict";
-                    console.log('Trying to update a record as ' + user);
                     login(user, "kenzan", function (clientuser) {
                         var updatedRecord = _.clone(newEmployeeRecord);
                         updatedRecord.firstName = 'Changed by ' + user;
@@ -218,7 +217,6 @@ describe('Rest server', function () {
                         updatedRecord.dateOfBirth = new Date(1950, 11, 26);
                         updatedRecord.dateOfEmployment = new Date(1940, 12, 25);
                         clientuser.updateEmployee(updatedRecord, function (resp) {
-                            console.dir(resp);
                             assert.notEqual(resp, null, 'response should not be null');
                             assert.ok("error" in resp, 'response should have an error field');
                             assert.ok("errorcode" in resp, 'response should have an error code field');
@@ -256,10 +254,8 @@ describe('Rest server', function () {
             it('should ' + not + 'be allowed by user ' + user, function (done) {
                 addNewEmployee('update1', function (newEmployeeRecord) {
                     "use strict";
-                    console.log('Trying to delete a record as ' + user);
                     login(user, "kenzan", function (clientuser) {
                         clientuser.deleteEmployee(newEmployeeRecord.id, function (resp) {
-                            console.dir(resp);
                             assert.notEqual(resp, null, 'response should not be null');
                             assert.ok("error" in resp, 'response should have an error field');
                             assert.ok("errorcode" in resp, 'response should have an error code field');
@@ -295,9 +291,26 @@ describe('Rest server', function () {
     describe.skip('Test nonexistent deletes', function () {
     });
 
-    describe.skip('Expired authorization token', function () {
+    describe('Expired authorization token', function () {
         "use strict";
-        it('should not allow a get_all', function(done){});
+        it('should not allow a get_all', function(done){
+            var jwt = new JWT({username: 'kenzanadu', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.payload.atIssued = new Date();
+            jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
+            jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
+            jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.get_TEST_Token() }
+            }, function (data, response) {
+                var resp = JSON.parse(data.toString());
+                assert.notEqual(resp, null, 'Response from service should not be null');
+                assert.ok("error" in resp, 'error field should exist in service response');
+                assert.ok("errorcode" in resp, 'errorcode field should exist in service response');
+                assert.notEqual(resp.error, null, 'error field should not be null');
+                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, resp.errorcode, 'error code should indicate not authorized');
+                done();
+            });
+        });
         it('should not allow a get_emp', function(done){});
         it('should not allow an add', function(done){});
         it('should not allow an update', function(done){});
