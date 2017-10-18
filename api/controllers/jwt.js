@@ -40,7 +40,7 @@ function JWTToken(token_or_employeeRecord) {
         this.payload.exp = new Date(this.payload.exp);
         this.payload.atIssued = new Date(this.payload.atIssued);
 
-        const calculated_signature = crypto.createHmac('sha256', SIGNING_KEY).update(tokenArray2[0] + '.' + tokenArray2[1]).digest();
+        const calculated_signature = crypto.createHmac('sha256', this.test_signing_key || SIGNING_KEY).update(tokenArray2[0] + '.' + tokenArray2[1]).digest();
         if (this.string_signature !== Buffer.from(calculated_signature).toString('base64')) {
             this.error = "Invalid signature in token";
             return;
@@ -69,44 +69,31 @@ function JWTToken(token_or_employeeRecord) {
         this.payload = {
             username: token_or_employeeRecord.username,
             iss: ISSUER,
-            //exp: new Date(),      These are set when user asks for the actual token
-            //atIssued: new Date(),
             roles: token_or_employeeRecord.roles
         };
-        //this.payload.exp.setMinutes(this.payload.atIssued.getMinutes()+EXPIRE_MINUTES);
     }
 }
 
 JWTToken.prototype.getToken = function () {
     "use strict";
     if(this.token) return this.token;
-    this.payload.atIssued = new Date();
-    this.payload.exp = new Date(this.payload.atIssued);
-    this.payload.exp.setMinutes(this.payload.exp.getMinutes() + EXPIRE_MINUTES);
-
-    var string_header = Buffer.from(JSON.stringify(this.header)).toString('base64');
-    var string_payload = Buffer.from(JSON.stringify(this.payload)).toString('base64');
-    const binary_signature = crypto.createHmac('sha256', SIGNING_KEY).update(string_header + '.' + string_payload).digest();
-    var string_signature = Buffer.from(binary_signature).toString('base64');
-
-    return "Bearer " + string_header + "." + string_payload + "." + string_signature;
+    this.payload.atIssued = (this.test_atIssued || new Date());
+    this.payload.exp = (this.test_exp || new Date(this.payload.atIssued));
+    if(!this.test_exp)
+        this.payload.exp.setMinutes(this.payload.exp.getMinutes() + EXPIRE_MINUTES);
+    return this.internalGetToken();
 };
 
-JWTToken.prototype.get_TEST_Token = function () {
-    //
-    // So yes, this is identical to the above, but does not set the issued time or the expiration time.
-    // We want this only for development testing purposes.
-    //
+JWTToken.prototype.internalGetToken = function() {
     "use strict";
-    if(this.token) return this.token;
-
     var string_header = Buffer.from(JSON.stringify(this.header)).toString('base64');
     var string_payload = Buffer.from(JSON.stringify(this.payload)).toString('base64');
-    const binary_signature = crypto.createHmac('sha256', SIGNING_KEY).update(string_header + '.' + string_payload).digest();
+    const binary_signature = crypto.createHmac('sha256', this.test_signing_key || SIGNING_KEY).update(string_header + '.' + string_payload).digest();
     var string_signature = Buffer.from(binary_signature).toString('base64');
 
     return "Bearer " + string_header + "." + string_payload + "." + string_signature;
-};
+
+}
 
 JWTToken.prototype.isValid = function () {
     return this.valid;

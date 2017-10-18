@@ -15,16 +15,23 @@ var validParser = {
         try {
             if(byteBuffer.length != 0) {
                 parsedData = JSON.parse(byteBuffer.toString());
-                if("dateOfBirth" in parsedData) parsedData.dateOfBirth = new Date(parsedData.dateOfBirth + " 00:00:00");
-                if("dateOfEmployment" in parsedData) parsedData.dateOfEmployment = new Date(parsedData.dateOfEmployment + " 00:00:00");
-                //parsedData.parsed = true;
+
+                if(parsedData) {
+                    if ("dateOfBirth" in parsedData) {
+                        if (parsedData.dateOfBirth.indexOf("00:00:00") == -1)
+                            parsedData.dateOfBirth = parsedData.dateOfBirth + " 00:00:00";
+                        parsedData.dateOfBirth = new Date(parsedData.dateOfBirth);
+                    }
+
+                    if ("dateOfEmployment" in parsedData) {
+                        if (parsedData.dateOfEmployment.indexOf("00:00:00") == -1)
+                            parsedData.dateOfEmployment = parsedData.dateOfEmployment + " 00:00:00";
+                        parsedData.dateOfEmployment = new Date(parsedData.dateOfEmployment);
+                    }
+                }
+
             }
-            //else parsedData = {parsed: true};
 
-            // emit custom event
-            //nrcEventEmitter('parsed','data has been parsed ' + parsedData);
-
-            // pass parsed data to client request method callback
             parsedCallback(parsedData);
         } catch (err) {
             nrcEventEmitter('error', err);
