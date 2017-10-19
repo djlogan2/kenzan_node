@@ -1,11 +1,11 @@
 var client = require('./restclient');
 var assert = require('assert');
-var statusCode = require('./statuscode');
+var errorCode = require('../api/controllers/errorcode');
 var _ = require('underscore');
 var JWT = require('../api/controllers/jwt');
 
-var URL = "http://localhost:8080/Kenzan/rest"; //    Java/Tomcat
-//var URL = "http://localhost:3000";             //    Our node.js server
+//var URL = "http://localhost:8080/Kenzan/rest"; //    Java/Tomcat
+var URL = "http://localhost:3000";             //    Our node.js server
 //var URL = "http://192.168.1.101:65376/rest";   //    Windows C#
 
 var RestClient = require('node-rest-client').Client;
@@ -60,7 +60,7 @@ function login(username, password, asyncCallback)
         assert.ok("errorcode" in resp, 'response should have an error code field');
         assert.ok("jwt" in resp, 'response should have a jwt field');
         assert.equal(resp.error, null, 'response error expected to be null');
-        assert.equal(resp.errorcode, statusCode.NONE, 'status code should indicate success');
+        assert.equal(resp.errorcode, errorCode.NONE, 'status code should indicate success');
         assert.notEqual(resp.jwt, null, 'response jwt expected to have a value');
         asyncCallback(clientuser);
     });
@@ -77,7 +77,7 @@ function addNewEmployee(prefix, asyncCallback)
             assert.ok("errorcode" in resp, 'response should have an error code field');
             assert.ok("id" in resp, 'response should have an id field');
             assert.equal(resp.error, null, 'response error should be null');
-            assert.equal(resp.errorcode, statusCode.NONE, 'error code should indicate a successful add');
+            assert.equal(resp.errorcode, errorCode.NONE, 'error code should indicate a successful add');
             emp.id = resp.id;
             asyncCallback(emp);
         });
@@ -86,19 +86,104 @@ function addNewEmployee(prefix, asyncCallback)
 
 describe('Rest server', function () {
 
-    describe.skip('Getting a single record', function(){
+    describe('Getting a single record', function(){
         "use strict";
-        it('should work if the user has a valid token, no roles necessary', function(done){});
-        it('should fail if no token sent', function(done){});
-        it('should work with an active record', function(done){});
-        it('should fail with an inactive record', function(done){});
+        it('should work if the user has a valid token, no roles necessary', function(done){
+            login('kenzana', 'kenzan', function(clientuser){
+                var added_employee = newEmployee('get1');
+                clientuser.addEmployee(added_employee, function(data){
+                    added_employee.id = data.id;
+                    login('kenzan', 'kenzan', function(clientuser2){
+                        clientuser2.getEmployee(added_employee.id, function(get_employee){
+                            assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+
+        it('should fail if no token sent', function(done){
+            login('kenzana', 'kenzan', function(clientuser){
+                var added_employee = newEmployee('get1');
+                clientuser.addEmployee(added_employee, function(data){
+                    added_employee.id = data.id;
+                    restclient.get(URL + "/get_emp?id=" + added_employee.id, {
+                        headers: { "Content-Type": "application/json" }
+                    }, function (data, response) {
+                        assert.notEqual(data, null, 'Response from service should not be null');
+                        assert.ok("error" in data, 'error field should exist in service response');
+                        assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                        assert.notEqual(data.error, null, 'error field should not be null');
+                        assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate expired token');
+                        done();
+                    });
+                });
+            });
+        });
+
+        // This works do to the first test working: it('should work with an active record', function(done){});
+
+        it('should return null with an inactive record', function(done){
+            login('kenzanadu', 'kenzan', function(clientuser){
+                var added_employee = newEmployee('get2');
+                clientuser.addEmployee(added_employee, function(resp){
+                    added_employee.id = resp.id;
+                    clientuser.deleteEmployee(added_employee.id, function(resp){
+                        clientuser.getEmployee(added_employee.id, function(data){
+                            assert.equal(data, null, 'Response from service should be null (no record returned)');
+                            done();
+                        });
+                    });
+                });
+            });
+        });
     });
 
-    describe.skip('Getting all records', function(){
+    describe('Getting all records', function(){
         "use strict";
-        it('should work if the user has a valid token, no roles necessary', function(done){});
-        it('should fail if no token sent', function(done){});
-        it('should return all active records', function(done){});
+        it('should work if the user has a valid token, no roles necessary', function(done){
+            login('kenzan', 'kenzan', function(clientuser){
+                clientuser.getAllEmployees(function(resp){
+                    assert.ok(resp instanceof Array, 'Response from get all employees should be an array');
+                    assert.ok(resp.length > 0, 'There should be records in the array');
+                    done();
+                });
+            });
+        });
+
+        it('should fail if no token sent', function(done){
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json" }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate expired token');
+                done();
+            });
+        });
+
+        it('should return all active records', function(done){
+            login('kenzanadu', 'kenzan', function(clientuser){
+                var added_employee = newEmployee('getall');
+                clientuser.addEmployee(added_employee, function(resp){
+                    added_employee.id = resp.id;
+                    clientuser.getAllEmployees(function(resp){
+                        assert.notEqual(null , _.find(resp, function(emp){
+                            return emp.id == added_employee.id;
+                        }), 'should find newly added employee record in get_all');
+                        clientuser.deleteEmployee(added_employee.id, function(resp){
+                            clientuser.getAllEmployees(function(resp){
+                                assert.equal(null , _.find(resp, function(emp){ return emp.id == added_employee.id; }), 'should no longer find newly added employee record in get_all');
+                                done();
+                            });
+                        });
+                    });
+                });
+            });
+        });
     });
 
     describe('Adding a record', function () {
@@ -115,12 +200,12 @@ describe('Rest server', function () {
                         assert.ok("id" in resp, 'response should have an id field');
                         if (not === '') {
                             assert.equal(resp.error, null, 'response error should be null');
-                            assert.equal(resp.errorcode, statusCode.NONE, 'error code should indicate no error');
+                            assert.equal(resp.errorcode, errorCode.NONE, 'error code should indicate no error');
                             assert.notEqual(resp.id, null, 'response id should not be null');
                         }
                         else {
                             assert.notEqual(resp.error, null, 'response error should not be null');
-                            assert.equal(resp.errorcode, statusCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
+                            assert.equal(resp.errorcode, errorCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                         }
                     });
                     done();
@@ -140,7 +225,7 @@ describe('Rest server', function () {
                         assert.ok("errorcode" in resp, 'response should have an error code field');
                         assert.ok("id" in resp, 'response should have an id field');
                         assert.notEqual(resp.error, null, 'response error should not be null');
-                        assert.equal(resp.errorcode, statusCode.CANNOT_INSERT_MISSING_FIELDS, 'error code should indicate missing fields');
+                        assert.equal(resp.errorcode, errorCode.CANNOT_INSERT_MISSING_FIELDS, 'error code should indicate missing fields');
                         done();
                     });
                 });
@@ -158,7 +243,7 @@ describe('Rest server', function () {
                     assert.ok("errorcode" in resp, 'response should have an error code field');
                     assert.ok("id" in resp, 'response should have an id field');
                     assert.equal(resp.error, null, 'response error should be null');
-                    assert.equal(resp.errorcode, statusCode.NONE, 'error code indicate success');
+                    assert.equal(resp.errorcode, errorCode.NONE, 'error code indicate success');
                     done();
                 });
             });
@@ -175,7 +260,7 @@ describe('Rest server', function () {
                     assert.ok("errorcode" in resp, 'response should have an error code field');
                     assert.ok("id" in resp, 'response should have an id field');
                     assert.notEqual(resp.error, null, 'response error should not be null');
-                    assert.equal(resp.errorcode, statusCode.CANNOT_INSERT_UNKNOWN_FIELDS, 'error code indicate extra fields');
+                    assert.equal(resp.errorcode, errorCode.CANNOT_INSERT_UNKNOWN_FIELDS, 'error code indicate extra fields');
                     done();
                 });
             });
@@ -192,7 +277,7 @@ describe('Rest server', function () {
                     assert.ok("errorcode" in resp, 'response should have an error code field');
                     assert.ok("id" in resp, 'response should have an id field');
                     assert.notEqual(resp.error, null, 'response error should not be null');
-                    assert.equal(resp.errorcode, statusCode.CANNOT_INSERT_UNKNOWN_FIELDS, 'error code indicate extra fields');
+                    assert.equal(resp.errorcode, errorCode.CANNOT_INSERT_UNKNOWN_FIELDS, 'error code indicate extra fields');
                     done();
                 });
             });
@@ -209,7 +294,7 @@ describe('Rest server', function () {
                         assert.ok("errorcode" in resp, 'response should have an error code field');
                         assert.ok("id" in resp, 'response should have an id field');
                         assert.notEqual(resp.error, null, 'response error should not be null');
-                        assert.equal(resp.errorcode, statusCode.DUPLICATE_RECORD, 'error code indicate a duplicate record');
+                        assert.equal(resp.errorcode, errorCode.DUPLICATE_RECORD, 'error code indicate a duplicate record');
                         done();
                     });
                 });
@@ -228,7 +313,7 @@ describe('Rest server', function () {
                             assert.ok("errorcode" in resp, 'response should have an error code field');
                             assert.ok("id" in resp, 'response should have an id field');
                             assert.equal(resp.error, null, 'response error should not be null');
-                            assert.equal(resp.errorcode, statusCode.NONE, 'error code indicate extra fields');
+                            assert.equal(resp.errorcode, errorCode.NONE, 'error code indicate extra fields');
                             done();
                         });
                     });
@@ -238,7 +323,7 @@ describe('Rest server', function () {
     });
 
     describe('Updating a record', function () {
-        variousUsers.forEach(function (user) {
+        ['kenzan'].forEach(function (user) {
             var not = '';
             if (user.indexOf('u', 6) === -1) not = 'not ';
             it('should ' + not + 'be allowed by user ' + user, function (done) {
@@ -258,7 +343,7 @@ describe('Rest server', function () {
                             assert.ok("id" in resp, 'response should have an id field');
                             if (not === '') {
                                 assert.equal(resp.error, null, 'response error should be null');
-                                assert.equal(resp.errorcode, statusCode.NONE, 'error code should indicate no error');
+                                assert.equal(resp.errorcode, errorCode.NONE, 'error code should indicate no error');
                                 assert.notEqual(resp.id, null, 'response id should not be null');
                                 clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
@@ -268,7 +353,7 @@ describe('Rest server', function () {
                             }
                             else {
                                 assert.notEqual(resp.error, null, 'response error should not be null');
-                                assert.equal(resp.errorcode, statusCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
+                                assert.equal(resp.errorcode, errorCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                                 clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
                                     assert.ok(areEmployeeRecordsEqual(employee, newEmployeeRecord), 'returned record should match the originally added data');
@@ -294,7 +379,7 @@ describe('Rest server', function () {
                             assert.ok("error" in data, 'error field should exist in service response');
                             assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                             assert.notEqual(data.error, null, 'error field should not be null');
-                            assert.equal(statusCode.CANNOT_INSERT_MISSING_FIELDS, data.errorcode, 'error code should indicate missing fields');
+                            assert.equal(errorCode.CANNOT_INSERT_MISSING_FIELDS, data.errorcode, 'error code should indicate missing fields');
                             done();
                         });
                     });
@@ -316,7 +401,7 @@ describe('Rest server', function () {
                             assert.ok("error" in data, 'error field should exist in service response');
                             assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                             assert.equal(data.error, null, 'error field should not be null');
-                            assert.equal(statusCode.NONE, data.errorcode, 'error code should indicate missing fields');
+                            assert.equal(errorCode.NONE, data.errorcode, 'error code should indicate missing fields');
                             done();
                         });
                     });
@@ -324,8 +409,47 @@ describe('Rest server', function () {
             });
         });
 
-        it.skip('should fail if the record does not exist', function(done){});
-        it.skip('should fail if the record is inactive', function(done){});
+        it('should fail if the record does not exist', function(done){
+            "use strict";
+            var made_up_employee = {
+                id: 12345678,
+                username: 'madeup',
+                dateOfBirth: new Date(2000, 1, 1),
+                firstName: 'fn_madeup',
+                lastName: 'ln_madeup',
+                bStatus: 'ACTIVE'
+            };
+            login('kenzanu', 'kenzan', function(clientuser){
+                clientuser.updateEmployee(made_up_employee, function(data){
+                    assert.notEqual(data, null, 'Response from service should not be null');
+                    assert.ok("error" in data, 'error field should exist in service response');
+                    assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                    assert.notEqual(data.error, null, 'error field should not be null');
+                    assert.equal(errorCode.CANNOT_UPDATE_NONEXISTENT_RECORD, data.errorcode, 'error code should indicate no record to update');
+                    done();
+                });
+            });
+        });
+
+        it('should fail if the record is inactive', function(done){
+            "use strict";
+            login('kenzanadu', 'kenzan', function(clientuser){
+                var emp = newEmployee('update3');
+                clientuser.addEmployee(emp, function(resp){
+                    emp.id = resp.id;
+                    clientuser.deleteEmployee(emp.id, function(resp){
+                        clientuser.updateEmployee(emp, function(data){
+                            assert.notEqual(data, null, 'Response from service should not be null');
+                            assert.ok("error" in data, 'error field should exist in service response');
+                            assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                            assert.notEqual(data.error, null, 'error field should not be null');
+                            assert.equal(errorCode.CANNOT_UPDATE_NONEXISTENT_RECORD, data.errorcode, 'error code should indicate no record to update');
+                            done();
+                        });
+                    });
+                });
+            });
+        });
         it.skip('should fail with an added spurious field', function(done){});
         it.skip('should fail with a password field', function(done){});
     });
@@ -335,7 +459,7 @@ describe('Rest server', function () {
             var not = '';
             if (user.indexOf('d', 6) === -1) not = 'not ';
             it('should ' + not + 'be allowed by user ' + user, function (done) {
-                addNewEmployee('update1', function (newEmployeeRecord) {
+                addNewEmployee('delete1', function (newEmployeeRecord) {
                     "use strict";
                     login(user, "kenzan", function (clientuser) {
                         clientuser.deleteEmployee(newEmployeeRecord.id, function (resp) {
@@ -345,7 +469,7 @@ describe('Rest server', function () {
                             assert.ok("id" in resp, 'response should have an id field');
                             if (not === '') {
                                 assert.equal(resp.error, null, 'response error should be null');
-                                assert.equal(resp.errorcode, statusCode.NONE, 'error code should indicate no error');
+                                assert.equal(resp.errorcode, errorCode.NONE, 'error code should indicate no error');
                                 assert.notEqual(resp.id, null, 'response id should not be null');
                                 clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
                                     assert.equal(employee, null, 'employee should be null');
@@ -354,7 +478,7 @@ describe('Rest server', function () {
                             }
                             else {
                                 assert.notEqual(resp.error, null, 'response error should not be null');
-                                assert.equal(resp.errorcode, statusCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
+                                assert.equal(resp.errorcode, errorCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                                 clientuser.getEmployee(newEmployeeRecord.id, function(employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
                                     assert.ok(areEmployeeRecordsEqual(employee, newEmployeeRecord), 'returned record should match the original data');
@@ -367,10 +491,39 @@ describe('Rest server', function () {
             });
         });
 
-        it.skip('should fail if the record is already inactive', function(done){});
-        it.skip('should fail if the record does not exist', function(done){});
-        it.skip('should no longer be returned with a get_emp', function(done){});
-        it.skip('should no longer be returned with a get_all', function(done){});
+        it('should fail if the record is already inactive', function(done){
+            "use strict";
+            login('kenzanadu', 'kenzan', function(clientuser){
+                var emp = newEmployee('delete2');
+                clientuser.addEmployee(emp, function(resp){
+                    emp.id = resp.id;
+                    clientuser.deleteEmployee(emp.id, function(resp){
+                        clientuser.deleteEmployee(emp.id, function(data){
+                            assert.notEqual(data, null, 'Response from service should not be null');
+                            assert.ok("error" in data, 'error field should exist in service response');
+                            assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                            assert.notEqual(data.error, null, 'error field should not be null');
+                            assert.equal(errorCode.CANNOT_DELETE_NONEXISTENT_RECORD, data.errorcode, 'error code should indicate cannot delete nonexistent record');
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+
+        it('should fail if the record does not exist', function(done){
+            "use strict";
+            login('kenzanadu', 'kenzan', function(clientuser){
+                clientuser.deleteEmployee(12345678, function(data){
+                    assert.notEqual(data, null, 'Response from service should not be null');
+                    assert.ok("error" in data, 'error field should exist in service response');
+                    assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                    assert.notEqual(data.error, null, 'error field should not be null');
+                    assert.equal(errorCode.CANNOT_DELETE_NONEXISTENT_RECORD, data.errorcode, 'error code should indicate cannot delete nonexistent record');
+                    done();
+                });
+            });
+        });
     });
 
     describe('Expired authorization token', function () {
@@ -389,7 +542,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
                 done();
             });
         });
@@ -408,7 +561,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
                 done();
             });
         });
@@ -428,7 +581,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
                 done();
             });
         });
@@ -449,7 +602,7 @@ describe('Rest server', function () {
                         assert.ok("error" in data, 'error field should exist in service response');
                         assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                         assert.notEqual(data.error, null, 'error field should not be null');
-                        assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
+                        assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
                         done();
                     });
                 });
@@ -469,7 +622,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
                 done();
             });
         });
@@ -488,7 +641,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED, data.errorcode, 'error code should indicate expired token');
                 done();
             });
         });
@@ -505,7 +658,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
+                assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
                 done();
             });
         });
@@ -519,7 +672,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
+                assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
                 done();
             });
         });
@@ -533,7 +686,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
+                assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
                 done();
             });
         });
@@ -549,7 +702,7 @@ describe('Rest server', function () {
                     assert.ok("error" in data, 'error field should exist in service response');
                     assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                     assert.notEqual(data.error, null, 'error field should not be null');
-                    assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
+                    assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
                     done();
                 });
             });
@@ -565,7 +718,7 @@ describe('Rest server', function () {
                         assert.ok("error" in data, 'error field should exist in service response');
                         assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                         assert.notEqual(data.error, null, 'error field should not be null');
-                        assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
+                        assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
                         done();
                     });
             });
@@ -582,7 +735,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
+                assert.equal(errorCode.NO_AUTHORIZATION_TOKEN, data.errorcode, 'error code should indicate not authorized');
                 done();
             });
         });
@@ -605,7 +758,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUER, data.errorcode, 'error code should indicate invalid issuer');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUER, data.errorcode, 'error code should indicate invalid issuer');
                 done();
             });
         });
@@ -620,7 +773,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_TOKEN_INVALID_SIGNATURE, data.errorcode, 'error code should indicate invalid signature');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_INVALID_SIGNATURE, data.errorcode, 'error code should indicate invalid signature');
                 done();
             });
         });
@@ -638,7 +791,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED, data.errorcode, 'error code should indicate invalid issued');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED, data.errorcode, 'error code should indicate invalid issued');
                 done();
             });
         });
@@ -656,7 +809,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED, data.errorcode, 'error code should indicate invalid issued');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED, data.errorcode, 'error code should indicate invalid issued');
                 done();
             });
         });
@@ -671,7 +824,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_PAYLOAD_NO_ISSUER, data.errorcode, 'error code should indicate invalid issuer');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_NO_ISSUER, data.errorcode, 'error code should indicate invalid issuer');
                 done();
             });
         });
@@ -687,7 +840,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_PAYLOAD_NO_ISSUED, data.errorcode, 'error code should indicate invalid issued');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_NO_ISSUED, data.errorcode, 'error code should indicate invalid issued');
                 done();
             });
         });
@@ -703,7 +856,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_PAYLOAD_NO_EXPIRATION, data.errorcode, 'error code should indicate invalid expiration');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_NO_EXPIRATION, data.errorcode, 'error code should indicate invalid expiration');
                 done();
             });
         });
@@ -718,7 +871,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_HEADER_INVALID_ALGORITHM, data.errorcode, 'error code should indicate invalid algorithm');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_HEADER_INVALID_ALGORITHM, data.errorcode, 'error code should indicate invalid algorithm');
                 done();
             });
         });
@@ -733,7 +886,7 @@ describe('Rest server', function () {
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
-                assert.equal(statusCode.INVALID_AUTHORIZATION_HEADER_INVALID_ALGORITHM, data.errorcode, 'error code should indicate invalid algorithm');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_HEADER_INVALID_ALGORITHM, data.errorcode, 'error code should indicate invalid algorithm');
                 done();
             });
         });
@@ -753,14 +906,14 @@ describe('Rest server', function () {
                                 assert.ok("error" in data, 'error field should exist in service response');
                                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                                 assert.equal(data.error, null, 'error field should be null');
-                                assert.equal(statusCode.NONE, data.errorcode, 'error code should indicate success');
+                                assert.equal(errorCode.NONE, data.errorcode, 'error code should indicate success');
                                 var clientuser2 = new client(URL);
                                 clientuser2.login(emp.username, emp.username, function (data) {
                                     assert.notEqual(data, null, 'Response from service should not be null');
                                     assert.ok("error" in data, 'error field should exist in service response');
                                     assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                                     assert.notEqual(data.error, null, 'error field should not be null');
-                                    assert.equal(statusCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid password');
+                                    assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid password');
                                     login(emp.username, 'someotherpassword', function(resp){done();}); // This should pass if we can login!
                                 });
                             });
@@ -770,7 +923,7 @@ describe('Rest server', function () {
             });
         });
 
-        // This works due to the previous test working. it('should succeed if an authorized user sets another active users password', function(done){});
+        // This works due to the previous test working: it('should succeed if an authorized user sets another active users password', function(done){});
         it('should fail if an authorized user sets another inactive users password', function(done){
             login('kenzanp', 'kenzan', function(adminuser) {
                 var emp = newEmployee('pwinactive');
@@ -781,7 +934,7 @@ describe('Rest server', function () {
                             assert.ok("error" in data, 'error field should exist in service response');
                             assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                             assert.notEqual(data.error, null, 'error field should not be null');
-                            assert.equal(statusCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid password');
+                            assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid password');
                             done();
                         });
                     });
@@ -798,7 +951,7 @@ describe('Rest server', function () {
                         assert.ok("error" in data, 'error field should exist in service response');
                         assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                         assert.notEqual(data.error, null, 'error field should not be null');
-                        assert.equal(statusCode.NOT_AUTHORIZED_FOR_OPERATION, data.errorcode, 'error code should indicate invalid password');
+                        assert.equal(errorCode.NOT_AUTHORIZED_FOR_OPERATION, data.errorcode, 'error code should indicate invalid password');
                         done();
                     });
                 });
@@ -816,7 +969,7 @@ describe('Rest server', function () {
                 assert.ok("errorcode" in resp, 'response should have an error code field');
                 assert.ok("jwt" in resp, 'response should have a jwt field');
                 assert.notEqual(resp.error, null, 'response error expected to not be null');
-                assert.equal(resp.errorcode, statusCode.INVALID_USERNAME_OR_PASSWORD, 'status code should indicate invalid username/password');
+                assert.equal(resp.errorcode, errorCode.INVALID_USERNAME_OR_PASSWORD, 'status code should indicate invalid username/password');
                 assert.equal(resp.jwt, null, 'response jwt expected to be null');
                 done();
             });
@@ -830,7 +983,7 @@ describe('Rest server', function () {
                 assert.ok("errorcode" in resp, 'response should have an error code field');
                 assert.ok("jwt" in resp, 'response should have a jwt field');
                 assert.notEqual(resp.error, null, 'response error expected to not be null');
-                assert.equal(resp.errorcode, statusCode.INVALID_USERNAME_OR_PASSWORD, 'status code should indicate invalid username/password');
+                assert.equal(resp.errorcode, errorCode.INVALID_USERNAME_OR_PASSWORD, 'status code should indicate invalid username/password');
                 assert.equal(resp.jwt, null, 'response jwt expected to be null');
                 done();
             });
@@ -849,7 +1002,7 @@ describe('Rest server', function () {
                                 assert.ok("errorcode" in resp, 'response should have an error code field');
                                 assert.ok("jwt" in resp, 'response should have a jwt field');
                                 assert.notEqual(resp.error, null, 'response error expected to not be null');
-                                assert.equal(resp.errorcode, statusCode.INVALID_USERNAME_OR_PASSWORD, 'status code should indicate invalid username/password');
+                                assert.equal(resp.errorcode, errorCode.INVALID_USERNAME_OR_PASSWORD, 'status code should indicate invalid username/password');
                                 assert.equal(resp.jwt, null, 'response jwt expected to be null');
                                 done();
                             });
@@ -858,5 +1011,10 @@ describe('Rest server', function () {
                 });
             });
         });
+
+        it.skip('should fail if there is no username field on the input', function(done){});
+        it.skip('should fail if there is no password field on the input', function(done){});
+        it.skip('should fail if there is a spurious field on the input', function(done){});
+        it.skip('should fail if there is no input structure sent', function(done){});
     });
 });

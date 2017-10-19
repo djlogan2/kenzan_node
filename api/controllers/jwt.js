@@ -78,6 +78,12 @@ JWTToken.prototype.getToken = function () {
     "use strict";
     if(this.token) return this.token;
     this.payload.atIssued = (this.test_atIssued || new Date());
+    //
+    // Add this if you're having trouble in your test framework around slightly different
+    // times causing your server and unit tests to fail incorrectly with "INVALID_ISSUED"
+    //
+    this.payload.atIssued.setMinutes(this.payload.atIssued.getMinutes() - 1, 0, 0);
+    // **********************************************************************************
     this.payload.exp = (this.test_exp || new Date(this.payload.atIssued));
     if(!this.test_exp)
         this.payload.exp.setMinutes(this.payload.exp.getMinutes() + EXPIRE_MINUTES);

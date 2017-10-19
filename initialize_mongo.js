@@ -119,5 +119,5 @@ db.employees.insert({
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
 	dateOfBirth: new Date(1968,11,26),
 	dateOfEmployment: new Date(2000,12,25),
-	roles: ['ROLE_SET_PASSWORD']
+	roles: ['ROLE_SET_PASSWORD', 'ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP']
 });

@@ -18,14 +18,14 @@ var validParser = {
 
                 if(parsedData) {
                     if ("dateOfBirth" in parsedData) {
-                        if (parsedData.dateOfBirth.indexOf("00:00:00") == -1)
-                            parsedData.dateOfBirth = parsedData.dateOfBirth + " 00:00:00";
+                        //if (parsedData.dateOfBirth.indexOf("00:00:00") == -1)
+                        //    parsedData.dateOfBirth = parsedData.dateOfBirth + " 00:00:00";
                         parsedData.dateOfBirth = new Date(parsedData.dateOfBirth);
                     }
 
                     if ("dateOfEmployment" in parsedData) {
-                        if (parsedData.dateOfEmployment.indexOf("00:00:00") == -1)
-                            parsedData.dateOfEmployment = parsedData.dateOfEmployment + " 00:00:00";
+                        //if (parsedData.dateOfEmployment.indexOf("00:00:00") == -1)
+                        //    parsedData.dateOfEmployment = parsedData.dateOfEmployment + " 00:00:00";
                         parsedData.dateOfEmployment = new Date(parsedData.dateOfEmployment);
                     }
                 }
@@ -67,6 +67,13 @@ RestClient.prototype.getEmployee = function (id, done) {
             "Authorization": this.jwt
         }
     }, function (data, response) {
+        if(data && "_id" in data)
+        {
+            Object.defineProperty(data, "id", {
+                get: function() {return this._id;},
+                set: function(val) {this._id = val; }
+            });
+        }
         done(data);
     });
 };
@@ -79,6 +86,16 @@ RestClient.prototype.getAllEmployees = function (done) {
             "Authorization": this.jwt
         }
     }, function (data, response) {
+        if(data)
+            data.forEach(function(emp){
+                if("_id" in emp)
+                {
+                    Object.defineProperty(emp, "id", {
+                        get: function() {return this._id;},
+                        set: function(val) {this._id = val; }
+                    });
+                }
+            });
         done(data);
     });
 };
@@ -95,6 +112,11 @@ RestClient.prototype.addEmployee = function (employee, done) {
 
 RestClient.prototype.updateEmployee = function (employee, done) {
     "use strict";
+    if("id" in employee)
+    {
+        employee._id = employee.id;
+        delete employee.id;
+    }
     client.post(this.url + "/update_emp", {
         headers: {"Content-Type": "application/json", "Authorization": this.jwt},
         data: employee
