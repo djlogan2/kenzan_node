@@ -119,7 +119,20 @@ exports.add_emp = function(req, res) {
 exports.update_emp = function(req, res) {
     "use strict";
     var emp = req.body;
+    var err = null;
     if(!isAuthorized(req, res, "ROLE_UPDATE_EMP")) return;
+    ['username', 'firstName', 'lastName', 'dateOfBirth', 'bStatus'].forEach(function(key){
+        if(!(key in emp))
+            err = {error: 'Missing field: ' + key, errorcode: errorCode.CANNOT_INSERT_MISSING_FIELDS, id: null};
+    });
+
+    ['middleInitial', 'dateOfEmployment'].forEach(function(key){
+        if(!(key in emp))
+            emp[key] = undefined;
+    });
+
+    if(err) { res.json(err); return; }
+
     Employee.findOneAndUpdate({_id: emp._id, bStatus: 'ACTIVE'}, emp, {upsert: false}, function(err, updated) {
         if(err || !updated) res.json({errorcode: errorCode.UNKNOWN_ERROR, error: "Unable to update" });
         else    res.json({ error: null, errorcode: errorCode.NONE, id: emp._id });
@@ -131,7 +144,8 @@ exports.delete_emp = function(req, res) {
     if(!isAuthorized(req, res, "ROLE_DELETE_EMP")) return;
     var id = req.query.id;
     Employee.findOneAndUpdate({_id: id, bStatus: 'ACTIVE'}, {bStatus: 'INACTIVE'}, {upsert: false}, function(err, updated) {
-        if(err) res.json({errorcode: errorCode.UNKNOWN_ERROR, error: "Unable to delete" });
+        if(!updated) res.json({ errorcode: errorCode.CANNOT_DELETE_NONEXISTENT_RECORD, error: 'Unable to delete', id: null });
+        else if(err) res.json({errorcode: errorCode.UNKNOWN_ERROR, error: "Unable to delete", id: null });
         else    res.json({ error: null, errorcode: errorCode.NONE, id: id });
     });
 };

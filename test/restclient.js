@@ -112,7 +112,7 @@ RestClient.prototype.addEmployee = function (employee, done) {
 
 RestClient.prototype.updateEmployee = function (employee, done) {
     "use strict";
-    if("id" in employee)
+    if("_id" in employee)
     {
         employee._id = employee.id;
         delete employee.id;

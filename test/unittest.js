@@ -4,9 +4,9 @@ var errorCode = require('../api/controllers/errorcode');
 var _ = require('underscore');
 var JWT = require('../api/controllers/jwt');
 
-//var URL = "http://localhost:8080/Kenzan/rest"; //    Java/Tomcat
-var URL = "http://localhost:3000";             //    Our node.js server
-//var URL = "http://192.168.1.101:65376/rest";   //    Windows C#
+//var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 'id';  //    Java/Tomcat
+var URL = "http://localhost:3000"; var DB_ID = '_id';             //    Our node.js server
+//var URL = "http://192.168.1.101:65376/rest"; var DB_ID = 'id';    //    Windows C#
 
 var RestClient = require('node-rest-client').Client;
 var restclient = new RestClient();
@@ -15,16 +15,25 @@ var variousUsers = ['kenzan', 'kenzana', 'kenzand', 'kenzanu', 'kenzanad', 'kenz
 
 var testno = 0;
 
+function optionalCompare(key, e1, e2, compare) {
+    "use strict";
+    if(!(key in e1) && !(key in e2)) return true;
+    if(!(key in e1) && (key in e2) && e2.key == null) return true;
+    if(!(key in e2) && (key in e1) && e1.key == null) return true;
+    if(!(key in e1) && (key in e2)) return false;
+    if(!(key in e2) && (key in e1)) return false;
+    if(compare) return compare(e1[key], e2[key]); else return (e1[key] === e2[key]);
+}
 function areEmployeeRecordsEqual(e1, e2) {
     "use strict";
     return (
       e1.username === e2.username &&
       e1.firstName === e2.firstName &&
-      e1.middleInitial === e2.middleInitial &&
+      optionalCompare("middleInitial", e1, e2) &&
       e1.lastName === e2.lastName &&
       e1.bStatus === e2.bStatus &&
-        (e1.dateOfBirth && e2.dateOfBirth && e1.dateOfBirth.getTime() === e2.dateOfBirth.getTime()) &&
-        ((!e1.dateOfEmployment && !e2.dateOfEmployment) || (e1.dateOfEmployment && e2.dateOfEmployment && e1.dateOfEmployment.getTime() === e2.dateOfEmployment.getTime()))
+      (e1.dateOfBirth && e2.dateOfBirth && e1.dateOfBirth.getTime() === e2.dateOfBirth.getTime()) &&
+      optionalCompare("dateOfEmployment", e1, e2, function(d1, d2) {return d1.getTime() === d2.getTime();})
     );
 }
 
@@ -207,8 +216,8 @@ describe('Rest server', function () {
                             assert.notEqual(resp.error, null, 'response error should not be null');
                             assert.equal(resp.errorcode, errorCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                         }
+                        done();
                     });
-                    done();
                 });
             });
 
@@ -366,7 +375,7 @@ describe('Rest server', function () {
             });
         });
 
-        ['username', 'dateOfBirth', 'firstName', 'lastName', 'bStatus'].forEach(function(key){
+        [DB_ID, 'username', 'dateOfBirth', 'firstName', 'lastName', 'bStatus'].forEach(function(key){
             it('should fail if we delete the ' + key, function(done){
                 login('kenzanadu', 'kenzan', function(clientuser){
                     "use strict";
@@ -400,9 +409,13 @@ describe('Rest server', function () {
                             assert.notEqual(data, null, 'Response from service should not be null');
                             assert.ok("error" in data, 'error field should exist in service response');
                             assert.ok("errorcode" in data, 'errorcode field should exist in service response');
-                            assert.equal(data.error, null, 'error field should not be null');
+                            assert.equal(data.error, null, 'error field should be null');
                             assert.equal(errorCode.NONE, data.errorcode, 'error code should indicate missing fields');
-                            done();
+                            clientuser.getEmployee(emp.id, function(updatedEmp){
+                                assert.ok(areEmployeeRecordsEqual(emp, updatedEmp), 'employee records should match');
+                                assert.ok(!(key in updatedEmp) || updatedEmp[key] === null, key + ' should no longer be in the updated employee record');
+                                done();
+                            });
                         });
                     });
                 });
@@ -989,12 +1002,13 @@ describe('Rest server', function () {
             });
         });
 
-        it('fails with a valid combination on an inactive record', function(){
+        it('fails with a valid combination on an inactive record', function(done){
             login('kenzanp', 'kenzan', function(clientuser){
-                var emp = new Employee('inactivelogin');
+                var emp = newEmployee('inactivelogin');
                 clientuser.addEmployee(emp, function(resp){
-                    clientuser.setPassword(emp.username, 'kenzan', function(done){
-                        clientuser.deleteEmployee(resp.id, function(resp){
+                    var addedId = resp.id;
+                    clientuser.setPassword(emp.username, 'kenzan', function(resp){
+                        clientuser.deleteEmployee(addedId, function(resp){
                             var clientuser2 = new client(URL);
                             clientuser2.login(emp.username, 'kenzan', function (resp) {
                                 assert.notEqual(resp, null, 'response should not be null');
