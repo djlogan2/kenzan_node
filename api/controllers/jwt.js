@@ -1,4 +1,5 @@
 var crypto = require('crypto');
+var errorCode = require('./errorcode');
 
 var ISSUER = 'Kenzan';
 var EXPIRE_MINUTES = 60;
@@ -10,26 +11,22 @@ function JWTToken(token_or_employeeRecord) {
         this.valid = false;
         this.token = token_or_employeeRecord;
         var tokenArray1 = token_or_employeeRecord.split(' ');
-        if (!tokenArray1 || tokenArray1.length === 0 || tokenArray1.length > 2) {
-            this.error = "Invalid token(1)";
+        if (!tokenArray1 || tokenArray1.length != 2) {
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR;
+            this.error = "Invalid token - No prefix";
             return;
         }
-        //
-        // We allow the user to return "Bearer <token>" or just "<token>"
-        // But if it's "<anything><space><anything>", it must obviously
-        // begin with "Bearer".
-        //
-        if (tokenArray1.length === 2) {
-            if (tokenArray1[0] !== "Bearer") {
-                this.error = "Invalid token(2)";
-                return;
-            }
-            tokenArray1[0] = tokenArray1[1];
+
+        if (tokenArray1[0] !== "Bearer") {
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR;
+            this.error = "Invalid token - no 'Bearer'";
+            return;
         }
 
-        var tokenArray2 = tokenArray1[0].split('.');
+        var tokenArray2 = tokenArray1[1].split('.');
         if (!tokenArray2 || tokenArray2.length !== 3) {
-            this.error = "Invalid token(3)";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR;
+            this.error = "Invalid token - Not three pieces";
             return;
         }
 
@@ -37,26 +34,79 @@ function JWTToken(token_or_employeeRecord) {
         this.payload = JSON.parse(Buffer.from(tokenArray2[1], 'base64'));
         this.string_signature = tokenArray2[2];
 
+        if(!this.header || !this.payload || !this.string_signature || typeof this.header !== 'object' || typeof this.payload !== 'object') {
+            this.error = "Missing expiration in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR;
+            return;
+        }
+
+        if (!this.payload.exp) {
+            this.error = "Missing expiration in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_NO_EXPIRATION;
+            return;
+        }
+
+        if (!this.payload.atIssued) {
+            this.error = "Missing issued in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_NO_ISSUED;
+            return;
+        }
+
         this.payload.exp = new Date(this.payload.exp);
         this.payload.atIssued = new Date(this.payload.atIssued);
 
+        if(Object.prototype.toString.call(this.payload.atIssued) !== '[object Date]' || isNaN(this.payload.atIssued.getTime())) {
+            this.error = "Invalid issue date in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED;
+            return;
+        }
+
+        if(Object.prototype.toString.call(this.payload.exp) !== '[object Date]' || isNaN(this.payload.exp.getTime())) {
+            this.error = "Invalid expiration date in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_EXPIRATION;
+            return;
+        }
+
         const calculated_signature = crypto.createHmac('sha256', this.test_signing_key || SIGNING_KEY).update(tokenArray2[0] + '.' + tokenArray2[1]).digest();
+
         if (this.string_signature !== Buffer.from(calculated_signature).toString('base64')) {
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_TOKEN_INVALID_SIGNATURE;
             this.error = "Invalid signature in token";
             return;
         }
 
         if (!this.header || !this.header.alg || this.header.alg !== "HS256") {
             this.error = "Invalid algorithm in token header";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_HEADER_INVALID_ALGORITHM;
             return;
         }
 
-        if (!this.payload.exp) {
-            this.error = "Missing expiration in token payload";
+        if(!this.payload.iss) {
+            this.error = "Missing issuer in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_NO_ISSUER;
+            return;
+        }
+
+        if(this.payload.iss !== ISSUER) {
+            this.error = "Invalid issuer in token payload";
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUER;
+            return;
+        }
+
+        if(this.payload.exp.getTime() <= this.payload.atIssued.getTime()) {
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED;
+            this.error = "Token has expired";
+            return;
+        }
+
+        if((new Date()).getTime() <= this.payload.atIssued.getTime()) {
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED;
+            this.error = "Token has expired";
             return;
         }
 
         if ((new Date()).getTime() > this.payload.exp.getTime()) {
+            this.errorcode = errorCode.INVALID_AUTHORIZATION_TOKEN_EXPIRED;
             this.error = "Token has expired";
             return;
         }

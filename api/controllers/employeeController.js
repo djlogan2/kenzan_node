@@ -6,25 +6,36 @@ var _ = require('underscore');
 Employee = mongoose.model('Employee');
 var JWT = require('./jwt');
 
-function isAuthorized(req, res, role)
+function isAuthorized2(req, res, role)
 {
+    "use strict";
     var token = req.headers['authorization'];
     if(token)
     {
         var checkJwt = new JWT(token);
-        if(checkJwt.isValid() && (!role || checkJwt.isInRole(role)))
-            return true;
+        if(!checkJwt.isValid()) {
+            res.json({errorcode: checkJwt.errorcode, error: checkJwt.error, id: null});
+            return [false, null];
+        }
+
+        if(!role || checkJwt.isInRole(role))
+            return [true, checkJwt.payload.username];
         else
         {
             res.json({ errorcode: errorCode.NOT_AUTHORIZED_FOR_OPERATION, error: "Not authorized", id: null });
-            return false;
+            return [false, null];
         }
     }
     else
     {
-        res.json({ errorcode: errorCode.NO_AUTHORIZATION_TOKEN, error: "Not authorized" });
-        return false;
+        res.json({ errorcode: errorCode.NO_AUTHORIZATION_TOKEN, error: "No authorization token", id: null });
+        return [false, null];
     }
+}
+
+function isAuthorized(req, res, role)
+{
+    return isAuthorized2(req, res, role)[0];
 }
 
 exports.login = function(req, res) {
@@ -79,6 +90,10 @@ exports.add_emp = function(req, res) {
     "use strict";
     if(!isAuthorized(req, res, "ROLE_ADD_EMP")) return;
     var emp = req.body;
+    //
+    // This doesn't appear to be transactional to me. What's stopping another thread from
+    // adding this employee after we do our find and before we do our save? Nothing that I know of...
+    //
     Employee.findOne({username: emp.username, bStatus: 'ACTIVE'}, function(err, found_emp) {
         if(!err && !found_emp)
         {
@@ -93,7 +108,7 @@ exports.add_emp = function(req, res) {
                     lastName: emp.lastName
                 });
             newEmp.save(function(err, emp){
-                if(err && err.message)
+                if(err)
                 {
                     if(err.name === 'ValidationError')
                         res.json( { errorcode: errorCode.CANNOT_INSERT_MISSING_FIELDS, error: err.message, id: null });
@@ -152,6 +167,15 @@ exports.delete_emp = function(req, res) {
 
 exports.set_password = function(req, res) {
     "use strict";
-    if(!isAuthorized(req, res, "ROLE_SET_PASSWORD")) return;
-    res.json( { errorcode: errorCode.UNKNOWN_ERROR, error: "Not implemented" });
+    var uid_pass = req.body;
+    var ia2 = isAuthorized2(req, res);
+    if(!ia2[0]) return;
+    if(ia2[1] != uid_pass.username && !isAuthorized(req, res, 'ROLE_SET_PASSWORD')) return;
+    bcrypt.hash(uid_pass.password, 10, function(err, hash){
+        Employee.findOneAndUpdate({username: uid_pass.username, bStatus: 'ACTIVE'}, {password: hash}, {upsert: false}, function(err, updated){
+            if(!updated) res.json({ errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: 'Unable to set users password', id: null });
+            else if(err) res.json({errorcode: errorCode.UNKNOWN_ERROR, error: "Unable to delete", id: null });
+            else    res.json({ error: null, errorcode: errorCode.NONE, id: updated.id });
+        });
+    });
 };

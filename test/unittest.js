@@ -329,6 +329,7 @@ describe('Rest server', function () {
                 });
             });
         });
+        it.skip('should fail if no record was sent', function(done){});
     });
 
     describe('Updating a record', function () {
@@ -465,6 +466,7 @@ describe('Rest server', function () {
         });
         it.skip('should fail with an added spurious field', function(done){});
         it.skip('should fail with a password field', function(done){});
+        it.skip('should fail if no record was sent', function(done){});
     });
 
     describe('Deleting a record', function () {
@@ -878,7 +880,7 @@ describe('Rest server', function () {
             var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
             delete jwt.header.alg;
             restclient.get(URL + "/get_all", {
-                headers: { "Content-Type": "application/json", Authorization: jwt.internalGetToken() }
+                headers: { "Content-Type": "application/json", Authorization: jwt.getToken() }
             }, function (data, response) {
                 assert.notEqual(data, null, 'Response from service should not be null');
                 assert.ok("error" in data, 'error field should exist in service response');
@@ -893,13 +895,100 @@ describe('Rest server', function () {
             var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
             jwt.header.alg = 'SMEL'; // An abbreviation of 'SoMething ELse' :)
             restclient.get(URL + "/get_all", {
-                headers: { "Content-Type": "application/json", Authorization: jwt.internalGetToken() }
+                headers: { "Content-Type": "application/json", Authorization: jwt.getToken() }
             }, function (data, response) {
                 assert.notEqual(data, null, 'Response from service should not be null');
                 assert.ok("error" in data, 'error field should exist in service response');
                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                 assert.notEqual(data.error, null, 'error field should not be null');
                 assert.equal(errorCode.INVALID_AUTHORIZATION_HEADER_INVALID_ALGORITHM, data.errorcode, 'error code should indicate invalid algorithm');
+                done();
+            });
+        });
+
+        it('should fail if header is null', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.header = null;
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.getToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR, data.errorcode, 'error code should indicate invalid algorithm');
+                done();
+            });
+        });
+        it('should fail if header is not a valid object', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.header = 'Not an object';
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.getToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR, data.errorcode, 'error code should indicate invalid algorithm');
+                done();
+            });
+        });
+        it('should fail if payload is null', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.payload = null;
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.internalGetToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR, data.errorcode, 'error code should indicate invalid algorithm');
+                done();
+            });
+        });
+        it('should fail if payload is not a valid object', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.payload = 'Not an object';
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.internalGetToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_TOKEN_PARSE_ERROR, data.errorcode, 'error code should indicate invalid algorithm');
+                done();
+            });
+        });
+        it('should fail if issue date is an invalid date', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.payload.exp = new Date();
+            jwt.payload.atIssued = 'Not a date';
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.internalGetToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_ISSUED, data.errorcode, 'error code should indicate invalid algorithm');
+                done();
+            });
+        });
+        it('should fail if expiration date is an invalid date', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            jwt.payload.atIssued = new Date();
+            jwt.payload.exp = 'Not a date';
+            restclient.get(URL + "/get_all", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.internalGetToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_AUTHORIZATION_PAYLOAD_INVALID_EXPIRATION, data.errorcode, 'error code should indicate invalid algorithm');
                 done();
             });
         });
@@ -922,12 +1011,13 @@ describe('Rest server', function () {
                                 assert.equal(errorCode.NONE, data.errorcode, 'error code should indicate success');
                                 var clientuser2 = new client(URL);
                                 clientuser2.login(emp.username, emp.username, function (data) {
+                                    console.log('here 6');
                                     assert.notEqual(data, null, 'Response from service should not be null');
                                     assert.ok("error" in data, 'error field should exist in service response');
                                     assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                                     assert.notEqual(data.error, null, 'error field should not be null');
                                     assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid password');
-                                    login(emp.username, 'someotherpassword', function(resp){done();}); // This should pass if we can login!
+                                    login(emp.username, 'someotherpassword', function(resp){console.log('here 7'); done();}); // This should pass if we can login!
                                 });
                             });
                         });
@@ -968,6 +1058,75 @@ describe('Rest server', function () {
                         done();
                     });
                 });
+            });
+        });
+
+        it('should fail if there is no username field on the input', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            restclient.post(URL + "/set_password", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.getToken() },
+                data: { password: 'somethingelse' }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username');
+                done();
+            });
+        });
+
+        it('should fail if there is no password field on the input', function(done){
+            login('kenzana', 'kenzan', function(clientuser){
+                var newemp = newEmployee('pass1');
+                clientuser.addEmployee(newemp, function(resp){
+                    var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+                    restclient.post(URL + "/set_password", {
+                        headers: { "Content-Type": "application/json", Authorization: jwt.getToken() },
+                        data: { username: newemp.username }
+                    }, function (data, response) {
+                        assert.notEqual(data, null, 'Response from service should not be null');
+                        assert.ok("error" in data, 'error field should exist in service response');
+                        assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                        assert.notEqual(data.error, null, 'error field should not be null');
+                        assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid password');
+                        done();
+                    });
+                });
+            });
+        });
+
+        it('should fail if there is a spurious field on the input', function(done){
+            login('kenzana', 'kenzan', function(clientuser){
+                var newemp = newEmployee('pass2');
+                clientuser.addEmployee(newemp, function(resp){
+                    var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+                    restclient.post(URL + "/set_password", {
+                        headers: { "Content-Type": "application/json", Authorization: jwt.getToken() },
+                        data: { username: newemp.username, password: 'somethingelse', somethingelse: 'exists' }
+                    }, function (data, response) {
+                        assert.notEqual(data, null, 'Response from service should not be null');
+                        assert.ok("error" in data, 'error field should exist in service response');
+                        assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                        assert.notEqual(data.error, null, 'error field should not be null');
+                        assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username');
+                        done();
+                    });
+                });
+            });
+        });
+
+        it('should fail if there is no input structure sent', function(done){
+            var jwt = new JWT({username: 'kenzanp', roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD' ] });
+            restclient.post(URL + "/set_password", {
+                headers: { "Content-Type": "application/json", Authorization: jwt.getToken() }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username/password');
+                done();
             });
         });
     });
@@ -1025,10 +1184,9 @@ describe('Rest server', function () {
                 });
             });
         });
-
-        it.skip('should fail if there is no username field on the input', function(done){});
-        it.skip('should fail if there is no password field on the input', function(done){});
-        it.skip('should fail if there is a spurious field on the input', function(done){});
-        it.skip('should fail if there is no input structure sent', function(done){});
+        it.skip('should fail if username is null or missing', function(done){});
+        it.skip('should fail if password is null or missing', function(done){});
+        it.skip('should fail if there are spurious keys in the object', function(done){});
+        it.skip('should fail if no object was sent', function(done){});
     });
 });
