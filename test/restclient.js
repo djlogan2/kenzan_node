@@ -17,15 +17,11 @@ var validParser = {
                 parsedData = JSON.parse(byteBuffer.toString());
 
                 if(parsedData) {
-                    if ("dateOfBirth" in parsedData) {
-                        //if (parsedData.dateOfBirth.indexOf("00:00:00") == -1)
-                        //    parsedData.dateOfBirth = parsedData.dateOfBirth + " 00:00:00";
+                    if (parsedData.dateOfBirth /*"dateOfBirth" in parsedData*/) {
                         parsedData.dateOfBirth = new Date(parsedData.dateOfBirth);
                     }
 
-                    if ("dateOfEmployment" in parsedData) {
-                        //if (parsedData.dateOfEmployment.indexOf("00:00:00") == -1)
-                        //    parsedData.dateOfEmployment = parsedData.dateOfEmployment + " 00:00:00";
+                    if (parsedData.dateOfEmployment /*"dateOfEmployment" in parsedData*/) {
                         parsedData.dateOfEmployment = new Date(parsedData.dateOfEmployment);
                     }
                 }

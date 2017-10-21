@@ -4,8 +4,8 @@ var errorCode = require('../api/controllers/errorcode');
 var _ = require('underscore');
 var JWT = require('../api/controllers/jwt');
 
-//var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 'id';  //    Java/Tomcat
-var URL = "http://localhost:3000"; var DB_ID = '_id';             //    Our node.js server
+var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 'id';  //    Java/Tomcat
+//var URL = "http://localhost:3000"; var DB_ID = '_id';             //    Our node.js server
 //var URL = "http://192.168.1.101:65376/rest"; var DB_ID = 'id';    //    Windows C#
 
 var RestClient = require('node-rest-client').Client;
@@ -114,7 +114,7 @@ describe('Rest server', function () {
 
         it('should fail if no token sent', function(done){
             login('kenzana', 'kenzan', function(clientuser){
-                var added_employee = newEmployee('get1');
+                var added_employee = newEmployee('get2');
                 clientuser.addEmployee(added_employee, function(data){
                     added_employee.id = data.id;
                     restclient.get(URL + "/get_emp?id=" + added_employee.id, {
@@ -135,7 +135,7 @@ describe('Rest server', function () {
 
         it('should return null with an inactive record', function(done){
             login('kenzanadu', 'kenzan', function(clientuser){
-                var added_employee = newEmployee('get2');
+                var added_employee = newEmployee('get3');
                 clientuser.addEmployee(added_employee, function(resp){
                     added_employee.id = resp.id;
                     clientuser.deleteEmployee(added_employee.id, function(resp){
@@ -258,7 +258,7 @@ describe('Rest server', function () {
             });
         });
 
-        it.skip('should fail with a spurious data element', function (done) {
+        it('should fail with a spurious data element', function (done) {
             "use strict";
             login("kenzana", "kenzan", function(clientuser){
                 var emp = newEmployee("add4");
@@ -275,10 +275,17 @@ describe('Rest server', function () {
             });
         });
 
+        //
+        // Currently there is no way for us to treat the password field as an invalid field in the Java server.
+        // Because the field exists in the Employee class, and because it's marked as @JsonIgnore, the validator
+        // identifies it as a known field that does not get deserialized. Thus, at this point, there is no way for
+        // this test to pass with the Java server. Basically the server will just happily ignore any field marked
+        // 'password'.
+        //
         it.skip('should fail with a password field', function (done) {
             "use strict";
             login("kenzana", "kenzan", function(clientuser){
-                var emp = newEmployee("add4");
+                var emp = newEmployee("add5");
                 emp.password = 'password string';
                 clientuser.addEmployee(emp, function(resp){
                     assert.notEqual(resp, null, 'response should not be null');
@@ -295,7 +302,7 @@ describe('Rest server', function () {
         it('should fail if a duplicate username with an active status is in the database', function(done){
             "use strict";
             login('kenzana', 'kenzan', function(clientuser){
-                var emp = newEmployee('add5');
+                var emp = newEmployee('add6');
                 clientuser.addEmployee(emp, function(resp){
                     clientuser.addEmployee(emp, function(resp){
                         assert.notEqual(resp, null, 'response should not be null');
@@ -313,7 +320,7 @@ describe('Rest server', function () {
         it('should succeed if a duplicate username with an inactive status is in the database', function(done){
             "use strict";
             login('kenzanadu', 'kenzan', function(clientuser){
-                var emp = newEmployee('add6');
+                var emp = newEmployee('add7');
                 clientuser.addEmployee(emp, function(resp){
                     clientuser.deleteEmployee(resp.id, function(resp){
                         clientuser.addEmployee(emp, function(resp){
@@ -329,7 +336,21 @@ describe('Rest server', function () {
                 });
             });
         });
-        it.skip('should fail if no record was sent', function(done){});
+        it.skip('should fail if no record was sent', function(done){
+            "use strict";
+            login('kenzanadu', 'kenzan', function(clientuser){
+                restclient.post(URL + "/login", {
+                    headers: { "Content-Type": "application/json", Authorization: clientuser.jwt }
+                }, function (data, response) {
+                    assert.notEqual(data, null, 'Response from service should not be null');
+                    assert.ok("error" in data, 'error field should exist in service response');
+                    assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                    assert.notEqual(data.error, null, 'error field should not be null');
+                    assert.equal(errorCode.UNKNOWN_ERROR, data.errorcode, 'error code should indicate some type of error');
+                    done();
+                });
+            });
+        });
     });
 
     describe('Updating a record', function () {
@@ -402,7 +423,7 @@ describe('Rest server', function () {
                 "use strict";
                 login('kenzanadu', 'kenzan', function(clientuser){
                     "use strict";
-                    var emp = newEmployee('update2');
+                    var emp = newEmployee('update3');
                     clientuser.addEmployee(emp, function(resp){
                         emp.id = resp.id;
                         delete emp[key];
@@ -448,7 +469,7 @@ describe('Rest server', function () {
         it('should fail if the record is inactive', function(done){
             "use strict";
             login('kenzanadu', 'kenzan', function(clientuser){
-                var emp = newEmployee('update3');
+                var emp = newEmployee('update4');
                 clientuser.addEmployee(emp, function(resp){
                     emp.id = resp.id;
                     clientuser.deleteEmployee(emp.id, function(resp){
@@ -464,8 +485,25 @@ describe('Rest server', function () {
                 });
             });
         });
-        it.skip('should fail with an added spurious field', function(done){});
-        it.skip('should fail with a password field', function(done){});
+        it.skip('should fail with an added spurious field', function(done){
+            "use strict";
+            login('kenzanadu', 'kenzan', function(clientuser){
+                var emp = newEmployee('update5');
+                clientuser.addEmployee(emp, function(resp){
+                    emp.id = resp.id;
+                    emp.something = 'else';
+                    clientuser.update(emp, function(resp){
+                        assert.notEqual(data, null, 'Response from service should not be null');
+                        assert.ok("error" in data, 'error field should exist in service response');
+                        assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                        assert.notEqual(data.error, null, 'error field should not be null');
+                        assert.equal(errorCode.CANNOT_INSERT_UNKNOWN_FIELDS, data.errorcode, 'error code should indicate there are extra fields');
+                        done();
+                    });
+                });
+            });
+        });
+        // ***** See the skipped test in adding records ***** it.skip('should fail with a password field', function(done){});
         it.skip('should fail if no record was sent', function(done){});
     });
 
@@ -1047,7 +1085,7 @@ describe('Rest server', function () {
 
         it('should fail if an unauthorized user sets another active users password', function(done){
             login('kenzana', 'kenzan', function(adminuser) {
-                var emp = newEmployee('pwinactive');
+                var emp = newEmployee('opwnauth');
                 adminuser.addEmployee(emp, function(resp){              // Add the user
                     adminuser.setPassword(emp.username, 'doesntmatter', function(data) { // This should now fail
                         assert.notEqual(data, null, 'Response from service should not be null');
@@ -1184,9 +1222,56 @@ describe('Rest server', function () {
                 });
             });
         });
-        it.skip('should fail if username is null or missing', function(done){});
-        it.skip('should fail if password is null or missing', function(done){});
-        it.skip('should fail if there are spurious keys in the object', function(done){});
-        it.skip('should fail if no object was sent', function(done){});
+        it('should fail if username is null or missing', function(done){
+            restclient.post(URL + "/login", {
+                headers: { "Content-Type": "application/json" },
+                data: { password: 'kenan' }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username/password');
+                done();
+            });
+        });
+        it('should fail if password is null or missing', function(done){
+            restclient.post(URL + "/login", {
+                headers: { "Content-Type": "application/json" },
+                data: { username: 'kenan' }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username/password');
+                done();
+            });
+        });
+        it('should fail if there are spurious keys in the object', function(done){
+            restclient.post(URL + "/login", {
+                headers: { "Content-Type": "application/json" },
+                data: { username: 'kenzan', password: 'kenan', something: 'else' }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username/password');
+                done();
+            });
+        });
+        it('should fail if no object was sent', function(done){
+            restclient.post(URL + "/login", {
+                headers: { "Content-Type": "application/json" }
+            }, function (data, response) {
+                assert.notEqual(data, null, 'Response from service should not be null');
+                assert.ok("error" in data, 'error field should exist in service response');
+                assert.ok("errorcode" in data, 'errorcode field should exist in service response');
+                assert.notEqual(data.error, null, 'error field should not be null');
+                assert.equal(errorCode.INVALID_USERNAME_OR_PASSWORD, data.errorcode, 'error code should indicate invalid username/password');
+                done();
+            });
+        });
     });
 });
