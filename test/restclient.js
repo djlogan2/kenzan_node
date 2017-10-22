@@ -108,10 +108,14 @@ RestClient.prototype.addEmployee = function (employee, done) {
 
 RestClient.prototype.updateEmployee = function (employee, done) {
     "use strict";
-    if("_id" in employee)
+    if("id" in employee)
     {
         employee._id = employee.id;
         delete employee.id;
+        Object.defineProperty(employee, "id", {
+            get: function() {return this._id;},
+            set: function(val) {this._id = val; }
+        });
     }
     client.post(this.url + "/update_emp", {
         headers: {"Content-Type": "application/json", "Authorization": this.jwt},

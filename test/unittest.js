@@ -5,8 +5,8 @@ var _ = require('underscore');
 var JWT = require('../api/controllers/jwt');
 
 //var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 'id';  //    Java/Tomcat
-//var URL = "http://localhost:3000"; var DB_ID = '_id';             //    Our node.js server
-var URL = "http://192.168.1.101:65376/rest"; var DB_ID = 'id';    //    Windows C#
+var URL = "http://localhost:3000"; var DB_ID = 'id';             //    Our node.js server
+//var URL = "http://192.168.1.101:65376/rest"; var DB_ID = 'id';    //    Windows C#
 
 var RestClient = require('node-rest-client').Client;
 var restclient = new RestClient();
@@ -400,7 +400,7 @@ describe('Rest server', function () {
             });
         });
 
-        [DB_ID, 'username', 'dateOfBirth', 'firstName', 'lastName', 'bStatus'].forEach(function (key) {
+        ['id', 'username', 'dateOfBirth', 'firstName', 'lastName', 'bStatus'].forEach(function (key) {
             it('should fail if we delete the ' + key, function (done) {
                 login('kenzanadu', 'kenzan', function (clientuser) {
                     "use strict";
@@ -571,7 +571,7 @@ describe('Rest server', function () {
         it('should fail if the record does not exist', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                clientuser.deleteEmployee(12345678, function (data) {
+                clientuser.deleteEmployee('59ecae77eb4f3875e66c800c', function (data) {
                     assert.notEqual(null, data, 'Response from service should not be null');
                     assert.ok("error" in data, 'error field should exist in service response');
                     assert.ok("errorcode" in data, 'errorcode field should exist in service response');
