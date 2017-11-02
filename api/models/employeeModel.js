@@ -10,6 +10,11 @@ var EmployeeSchema = new Schema({
         required: 'Please enter username'
     },
 
+    email: {
+        type: String,
+        required: 'Please enter email'
+    },
+
     firstName: {
         type: String,
         required: 'Please enter first name'

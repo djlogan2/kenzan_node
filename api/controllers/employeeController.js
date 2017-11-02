@@ -8,10 +8,10 @@ var JWT = require('./jwt');
 
 function isEmployeeRecordValid(res, emp, id_required) {
     "use strict";
-    var fieldCount = 5;
+    var fieldCount = 6;
     var err = null;
 
-    ['dateOfBirth', 'firstName', 'lastName', 'bStatus', 'username'].forEach(function (key) {
+    ['dateOfBirth', 'firstName', 'lastName', 'bStatus', 'username', 'email'].forEach(function (key) {
         if (!(key in emp) || !emp[key]) {
             err = {errorcode: errorCode.CANNOT_INSERT_MISSING_FIELDS, error: key + ' is missing', id: null};
         } // Required field(s) do not exist
@@ -172,6 +172,7 @@ exports.add_emp = function(req, res) {
             var newEmp = new Employee(
                 {
                     username: emp.username,
+                    email: emp.email,
                     dateOfBirth: emp.dateOfBirth,
                     dateOfEmployment: emp.dateOfEmployment,
                     bStatus: emp.bStatus,

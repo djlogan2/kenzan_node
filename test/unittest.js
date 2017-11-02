@@ -4,8 +4,9 @@ var errorCode = require('../api/controllers/errorcode');
 var _ = require('underscore');
 var JWT = require('../api/controllers/jwt');
 
-var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 12345678;  //    Java/Tomcat
-//var URL = "http://localhost:3000"; var DB_ID = '59ece620be2b19821cfba9ec';             //    Our node.js server
+//var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 12345678;  //    Java/Tomcat
+//var URL = "http://192.168.1.69:3000/rest"; var DB_ID = 12345678;             //    Ruby server
+var URL = "http://localhost:3000"; var DB_ID = '59ece620be2b19821cfba9ec';             //    Our node.js server
 //var URL = "http://192.168.1.101:65376/rest";  DB_ID = 12345678;    //    Windows C#
 
 var RestClient = require('node-rest-client').Client;
@@ -29,6 +30,7 @@ function areEmployeeRecordsEqual(e1, e2) {
     "use strict";
     return (
         e1.username === e2.username &&
+        e1.email === e2.email &&
         e1.firstName === e2.firstName &&
         optionalCompare("middleInitial", e1, e2) &&
         e1.lastName === e2.lastName &&
@@ -44,6 +46,7 @@ function newEmployee(prefix) {
     "use strict";
     var emp = {
         username: "user" + prefix + testno,
+        email: 'user' + prefix + testno + '@kenzan.com',
         dateOfBirth: new Date(),
         dateOfEmployment: new Date(),
         bStatus: 'ACTIVE',
@@ -218,7 +221,7 @@ describe('Rest server', function () {
 
         });
 
-        ["username", "dateOfBirth", "firstName", "lastName", "bStatus"].forEach(function (key) {
+        ["username", "email", "dateOfBirth", "firstName", "lastName", "bStatus"].forEach(function (key) {
             it('should fail without a ' + key, function (done) {
                 login("kenzana", "kenzan", function (clientuser) {
                     var emp = newEmployee("add2");
@@ -334,14 +337,14 @@ describe('Rest server', function () {
         it('should fail if no record was sent', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                restclient.post(URL + "/login", {
+                restclient.post(URL + "/add_emp", {
                     headers: {"Content-Type": "application/json", Authorization: clientuser.jwt}
                 }, function (data, response) {
                     assert.notEqual(data, null, 'Response from service should not be null');
                     assert.ok("error" in data, 'error field should exist in service response');
                     assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                     assert.notEqual(data.error, null, 'error field should not be null');
-                    assert.equal(data.errorcode, errorCode.INVALID_USERNAME_OR_PASSWORD, 'error code should indicate some type of error');
+                    assert.equal(data.errorcode, errorCode.CANNOT_INSERT_MISSING_FIELDS, 'error code should indicate some type of error');
                     done();
                 });
             });
@@ -444,6 +447,7 @@ describe('Rest server', function () {
             var made_up_employee = {
                 id: DB_ID,
                 username: 'madeup',
+                email: 'madeup@madeup.com',
                 dateOfBirth: new Date(2000, 1, 1),
                 firstName: 'fn_madeup',
                 lastName: 'ln_madeup',
@@ -857,7 +861,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.payload.exp = new Date();
-            jwt.payload.exp.setMinutes(jwt.payload.exp.getMinutes() - 120);
+            jwt.payload.exp.setMinutes(jwt.payload.exp.getMinutes() + 60);
             jwt.payload.atIssued = new Date(jwt.payload.exp.getTime());
             jwt.payload.atIssued.setMinutes(jwt.payload.exp.getMinutes() + 60);
             restclient.get(URL + "/get_all", {
