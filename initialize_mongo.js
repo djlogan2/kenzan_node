@@ -6,6 +6,7 @@ db.createCollection('employees');
 db.employees.insert({
 	username: 'djlogan2',
 	firstName: 'David',
+   email: 'djlogan2.dl@gmail.com',
 	lastName: 'Logan',
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
@@ -17,6 +18,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzan',
+   email: 'kenzan@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -28,6 +30,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzana',
+   email: 'kenzana@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -40,6 +43,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzanad',
+   email: 'kenzanad@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -52,6 +56,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzanau',
+   email: 'kenzan@kenzanau.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -64,6 +69,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzanadu',
+   email: 'kenzanadu@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -76,6 +82,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzand',
+   email: 'kenzand@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -88,6 +95,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzandu',
+   email: 'kenzandu@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -100,6 +108,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzanu',
+   email: 'kenzanu@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',
@@ -112,6 +121,7 @@ db.employees.insert({
 
 db.employees.insert({
 	username: 'kenzanp',
+   email: 'kenzanp@kenzan.com',
 	firstName: 'David',
 	lastName: 'Logan',
 	middleInitial: 'J',

@@ -5,7 +5,7 @@ var _ = require('underscore');
 var JWT = require('../api/controllers/jwt');
 
 //var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 12345678;  //    Java/Tomcat
-//var URL = "http://192.168.1.69:3000/rest"; var DB_ID = 12345678;             //    Ruby server
+//var URL = "http://localhost:3000/rest"; var DB_ID = 12345678;             //    Ruby server
 var URL = "http://localhost:3000"; var DB_ID = '59ece620be2b19821cfba9ec';             //    Our node.js server
 //var URL = "http://192.168.1.101:65376/rest";  DB_ID = 12345678;    //    Windows C#
 

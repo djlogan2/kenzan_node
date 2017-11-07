@@ -31,6 +31,7 @@
     "bcrypt": "^1.0.3",
     "body-parser": "^1.18.2",
     "express": "^4.16.2",
+    "express-authentication-bearer": "^0.2.1",
     "mongoose": "^4.12.1",
     "typed-enum": "^0.1.1",
     "underscore": "^1.8.3"

@@ -1,10 +1,10 @@
-var mongoose = require('mongoose');
-var bcrypt = require('bcrypt');
-var errorCode = require('./errorcode');
-var _ = require('underscore');
+var mongoose = require('mongoose'),
+    bcrypt = require('bcrypt'),
+    errorCode = require('./errorcode'),
+    _ = require('underscore'),
+    JWT = require('./jwt');
 
 Employee = mongoose.model('Employee');
-var JWT = require('./jwt');
 
 function isEmployeeRecordValid(res, emp, id_required) {
     "use strict";
@@ -64,6 +64,7 @@ function isEmployeeRecordValid(res, emp, id_required) {
     return true;
 }
 
+/*
 function isAuthorized2(req, res, role)
 {
     "use strict";
@@ -95,6 +96,7 @@ function isAuthorized(req, res, role)
 {
     return isAuthorized2(req, res, role)[0];
 }
+*/
 
 exports.login = function(req, res) {
     "use strict";
@@ -124,7 +126,7 @@ exports.login = function(req, res) {
 
 exports.get_emp = function(req, res) {
     "use strict";
-    if(!isAuthorized(req, res)) return;
+    //if(!isAuthorized(req, res)) return;
     Employee.findOne({bStatus: 'ACTIVE', _id: req.query.id}, function(err, employee){
         if(err)
             res.json({errorcode: errorCode.UNKNOWN_ERROR, error: err.message});
@@ -136,7 +138,7 @@ exports.get_emp = function(req, res) {
 
 exports.get_all = function(req, res) {
     "use strict";
-    if(!isAuthorized(req, res)) return;
+    //if(!isAuthorized(req, res)) return;
   Employee.find({bStatus: 'ACTIVE'}, function(err, employees) {
      if(err)
         res.json({errorcode: errorCode.UNKNOWN_ERROR, error: err.message});
@@ -147,19 +149,9 @@ exports.get_all = function(req, res) {
 
 };
 
-function ourJson(obj)
-{
-    "use strict";
-    console.log('res.json called');
-    console.dir(obj);
-    return this.originalJson(obj);
-}
-
 exports.add_emp = function(req, res) {
     "use strict";
-    //res.originalJson = res.json;
-    //res.json = ourJson;
-    if(!isAuthorized(req, res, "ROLE_ADD_EMP")) return;
+    //if(!isAuthorized(req, res, "ROLE_ADD_EMP")) return;
     var emp = req.body;
     if(!isEmployeeRecordValid(res, emp, false)) return;
     //
@@ -208,7 +200,7 @@ exports.update_emp = function(req, res) {
     "use strict";
     var emp = req.body;
     var err = null;
-    if(!isAuthorized(req, res, "ROLE_UPDATE_EMP")) return;
+    //if(!isAuthorized(req, res, "ROLE_UPDATE_EMP")) return;
     if(!isEmployeeRecordValid(res, emp, true)) return;
 
     //
@@ -232,7 +224,7 @@ exports.update_emp = function(req, res) {
 
 exports.delete_emp = function(req, res) {
     "use strict";
-    if(!isAuthorized(req, res, "ROLE_DELETE_EMP")) return;
+    //if(!isAuthorized(req, res, "ROLE_DELETE_EMP")) return;
     var id = req.query.id;
     Employee.findOneAndUpdate({_id: id, bStatus: 'ACTIVE'}, {bStatus: 'INACTIVE'}, {upsert: false}, function(err, updated) {
         if(err)
@@ -248,16 +240,17 @@ exports.set_password = function(req, res) {
     "use strict";
     var uid_pass = req.body;
 
-    var ia2 = isAuthorized2(req, res);
-    if(!ia2[0]) return;
-
     if(!uid_pass || Object.keys(uid_pass).length !== 2 || !uid_pass.username || !uid_pass.password)
     {
         res.json({ errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: 'Unable to set users password', id: null });
         return;
     }
 
-    if(ia2[1] != uid_pass.username && !isAuthorized(req, res, 'ROLE_SET_PASSWORD')) return;
+    if(req.payload.username !== uid_pass.username && _.indexOf(req.payload.roles, 'ROLE_SET_PASSWORD') < 0)
+    {
+        res.json({ errorcode: errorCode.NOT_AUTHORIZED_FOR_OPERATION, error: 'Unable to set users password', id: null });
+        return;
+    }
 
     bcrypt.hash(uid_pass.password, 10, function(err, hash){
         Employee.findOneAndUpdate({username: uid_pass.username, bStatus: 'ACTIVE'}, {password: hash}, {upsert: false}, function(err, updated){
