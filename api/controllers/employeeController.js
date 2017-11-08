@@ -1,8 +1,8 @@
 var mongoose = require('mongoose'),
     bcrypt = require('bcrypt'),
-    errorCode = require('./errorcode'),
+    errorCode = require('../lib/errorcode'),
     _ = require('underscore'),
-    JWT = require('./jwt');
+    JWT = require('../lib/jwt');
 
 Employee = mongoose.model('Employee');
 
@@ -246,7 +246,7 @@ exports.set_password = function(req, res) {
         return;
     }
 
-    if(req.payload.username !== uid_pass.username && _.indexOf(req.payload.roles, 'ROLE_SET_PASSWORD') < 0)
+    if(req.jwt.payload.username !== uid_pass.username && !req.jwt.isInRole('ROLE_SET_PASSWORD'))
     {
         res.json({ errorcode: errorCode.NOT_AUTHORIZED_FOR_OPERATION, error: 'Unable to set users password', id: null });
         return;

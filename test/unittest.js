@@ -1,8 +1,8 @@
 var client = require('./restclient');
 var assert = require('assert');
-var errorCode = require('../api/controllers/errorcode');
+var errorCode = require('../api/lib/errorcode');
 var _ = require('underscore');
-var JWT = require('../api/controllers/jwt');
+var JWT = require('../api/lib/jwt');
 
 //var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 12345678;  //    Java/Tomcat
 //var URL = "http://localhost:3000/rest"; var DB_ID = 12345678;             //    Ruby server
