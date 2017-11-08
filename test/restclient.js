@@ -1,8 +1,6 @@
 var Client = require('node-rest-client').Client;
 var client = new Client();
 
-var _ = require('underscore');
-
 var validParser = {
     name: "JSON",
     isDefault: false,
@@ -13,7 +11,7 @@ var validParser = {
         "use strict";
         var parsedData = null;
         try {
-            if(byteBuffer.length != 0) {
+            if(byteBuffer.length !== 0) {
                 parsedData = JSON.parse(byteBuffer.toString());
 
                 if(parsedData) {
@@ -48,8 +46,8 @@ RestClient.prototype.login = function (username, password, done) {
     client.post(this.url + "/login", {
         data: {username: username, password: password},
         headers: {"Content-Type": "application/json"}
-    }, function (data, response) {
-        if ("jwt" in data && data.jwt != null)
+    }, function (data) {
+        if (data.jwt)
             self.jwt = data.jwt;
         done(data);
     });
@@ -62,7 +60,7 @@ RestClient.prototype.getEmployee = function (id, done) {
             "Content-Type": "application/json",
             "Authorization": this.jwt
         }
-    }, function (data, response) {
+    }, function (data) {
         if(data && "_id" in data)
         {
             Object.defineProperty(data, "id", {
@@ -81,7 +79,7 @@ RestClient.prototype.getAllEmployees = function (done) {
             "Content-Type": "application/json",
             "Authorization": this.jwt
         }
-    }, function (data, response) {
+    }, function (data) {
         if(data)
             data.forEach(function(emp){
                 if("_id" in emp)
@@ -101,7 +99,7 @@ RestClient.prototype.addEmployee = function (employee, done) {
     client.post(this.url + "/add_emp", {
         headers: {"Content-Type": "application/json", "Authorization": this.jwt},
         data: employee
-    }, function (data, response) {
+    }, function (data) {
         done(data);
     });
 };
@@ -120,7 +118,7 @@ RestClient.prototype.updateEmployee = function (employee, done) {
     client.post(this.url + "/update_emp", {
         headers: {"Content-Type": "application/json", "Authorization": this.jwt},
         data: employee
-    }, function (data, response) {
+    }, function (data) {
         done(data);
     });
 };
@@ -132,7 +130,7 @@ RestClient.prototype.deleteEmployee = function (id, done) {
             "Content-Type": "application/json",
             "Authorization": this.jwt
         }
-    }, function (data, response) {
+    }, function (data) {
         done(data);
     });
 };
@@ -142,7 +140,7 @@ RestClient.prototype.setPassword = function (username, password, done) {
     client.post(this.url + "/set_password", {
         data: {username: username, password: password},
         headers: {"Content-Type": "application/json", Authorization: this.jwt}
-    }, function (data, response) {
+    }, function (data) {
         done(data);
     });
 };

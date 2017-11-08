@@ -1,5 +1,4 @@
-var _ = require('underscore'),
-    errorCode = require('./errorcode');
+var errorCode = require('./errorcode');
 
 module.exports = function(role) {
     "use strict";

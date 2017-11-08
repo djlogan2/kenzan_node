@@ -1,12 +1,9 @@
 var express = require('express'),
-    errorCode = require('./api/lib/errorcode'),
     JWT = require('./api/lib/jwt'),
     app = express(),
     port = process.env.PORT || 3000,
     mongoose = require('mongoose'),
-    Employee = require('./api/models/employeeModel'),
-    bodyParser = require('body-parser'),
-    _ = require('underscore')
+    bodyParser = require('body-parser');
 
 //
 // Mongoose instance

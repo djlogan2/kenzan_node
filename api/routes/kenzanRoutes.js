@@ -1,6 +1,6 @@
 'use strict';
 
-var authorize = require('../lib/authorizerole')
+var authorize = require('../lib/authorizerole');
 
 module.exports = function(app) {
   var employeeController = require('../controllers/employeeController.js');

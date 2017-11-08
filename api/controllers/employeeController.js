@@ -1,7 +1,6 @@
 var mongoose = require('mongoose'),
     bcrypt = require('bcrypt'),
     errorCode = require('../lib/errorcode'),
-    _ = require('underscore'),
     JWT = require('../lib/jwt');
 
 Employee = mongoose.model('Employee');
@@ -199,8 +198,7 @@ exports.add_emp = function(req, res) {
 exports.update_emp = function(req, res) {
     "use strict";
     var emp = req.body;
-    var err = null;
-    //if(!isAuthorized(req, res, "ROLE_UPDATE_EMP")) return;
+
     if(!isEmployeeRecordValid(res, emp, true)) return;
 
     //
