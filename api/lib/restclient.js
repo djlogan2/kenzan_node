@@ -1,5 +1,6 @@
 var Client = require('node-rest-client').Client;
 var client = new Client();
+var ErrorCode = require('./errorcode');
 
 var validParser = {
     name: "JSON",
@@ -35,12 +36,41 @@ var validParser = {
 
 client.parsers.add(validParser);
 
-function RestClient(url) {
+function RestClient(url, type) {
     "use strict";
     this.url = url;
+    var prefix = 'c_';
+    if(type === 'promises') prefix = 'p_';
+    for(var attr in this)
+    {
+        if(attr.indexOf(prefix) === 0)
+        {
+            var newProperty = attr.substr(prefix.length);
+            this[newProperty] = this[attr];
+        }
+    }
 }
 
-RestClient.prototype.login = function (username, password, done) {
+RestClient.prototype.promise_X = function() {
+    "use strict";
+
+    var args = [].slice.call(arguments);
+    var self = this;
+    var restFunction = args.shift();
+
+    return new Promise(function(resolve, reject){
+        args.push(function(data){
+            if(data.errorcode && data.errorcode !== ErrorCode.NONE)
+                reject(data);
+            else
+                resolve(data);
+            return self;
+        });
+        restFunction.apply(self, args)
+    });
+};
+
+RestClient.prototype.c_login = function (username, password, done) {
     "use strict";
     var self = this;
     client.post(this.url + "/login", {
@@ -53,9 +83,29 @@ RestClient.prototype.login = function (username, password, done) {
     });
 };
 
-RestClient.prototype.getEmployee = function (id, done) {
+RestClient.prototype.p_login = function(username, password) {
     "use strict";
-    client.get(this.url + "/get_emp?id=" + id, {
+    return this.promise_X(this.c_login, username, password);
+};
+
+RestClient.prototype.c_getEmployee = function (data, done) {
+    "use strict";
+    var parameters = '';
+    if(typeof data !== 'object')
+    {
+        parameters = 'id=' + data;
+    }
+    else
+    {
+        var ampersand = '';
+        for(var key in data)
+        {
+            parameters += ampersand + key + '=' + encodeURI(data[key]);
+            ampersand = '&';
+        }
+    }
+
+    client.get(this.url + "/get_emp?" + parameters, {
         headers: {
             "Content-Type": "application/json",
             "Authorization": this.jwt
@@ -72,7 +122,12 @@ RestClient.prototype.getEmployee = function (id, done) {
     });
 };
 
-RestClient.prototype.getAllEmployees = function (done) {
+RestClient.prototype.p_getEmployee = function(id) {
+    "use strict";
+    return this.promise_X(this.c_getEmployee, id);
+};
+
+RestClient.prototype.c_getAllEmployees = function (done) {
     "use strict";
     client.get(this.url + "/get_all", {
         headers: {
@@ -94,7 +149,12 @@ RestClient.prototype.getAllEmployees = function (done) {
     });
 };
 
-RestClient.prototype.addEmployee = function (employee, done) {
+RestClient.prototype.p_getAllEmployees = function() {
+    "use strict";
+    return this.promise_X(this.c_getAllEmployees);
+};
+
+RestClient.prototype.c_addEmployee = function (employee, done) {
     "use strict";
     client.post(this.url + "/add_emp", {
         headers: {"Content-Type": "application/json", "Authorization": this.jwt},
@@ -104,7 +164,12 @@ RestClient.prototype.addEmployee = function (employee, done) {
     });
 };
 
-RestClient.prototype.updateEmployee = function (employee, done) {
+RestClient.prototype.p_addEmployee = function(employee) {
+    "use strict";
+    return this.promise_X(this.c_addEmployee, employee);
+};
+
+RestClient.prototype.c_updateEmployee = function (employee, done) {
     "use strict";
     if("id" in employee)
     {
@@ -123,7 +188,12 @@ RestClient.prototype.updateEmployee = function (employee, done) {
     });
 };
 
-RestClient.prototype.deleteEmployee = function (id, done) {
+RestClient.prototype.p_updateEmployee = function(employee) {
+    "use strict";
+    return this.promise_X(this.c_updateEmployee, employee);
+};
+
+RestClient.prototype.c_deleteEmployee = function (id, done) {
     "use strict";
     client.get(this.url + "/delete_emp?id=" + id, {
         headers: {
@@ -135,7 +205,12 @@ RestClient.prototype.deleteEmployee = function (id, done) {
     });
 };
 
-RestClient.prototype.setPassword = function (username, password, done) {
+RestClient.prototype.p_deleteEmployee = function(id) {
+    "use strict";
+    return this.promise_X(this.c_deleteEmployee, id);
+};
+
+RestClient.prototype.c_setPassword = function (username, password, done) {
     "use strict";
     client.post(this.url + "/set_password", {
         data: {username: username, password: password},
@@ -143,6 +218,11 @@ RestClient.prototype.setPassword = function (username, password, done) {
     }, function (data) {
         done(data);
     });
+};
+
+RestClient.prototype.p_setPassword = function(username, password) {
+    "use strict";
+    return this.promise_X(this.c_setPassword, username, password);
 };
 
 module.exports = RestClient;

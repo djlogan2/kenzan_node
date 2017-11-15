@@ -1,0 +1,15 @@
+<form>
+    <table>
+        {{#each employees}}
+            <tr>
+                <td>{{username}}</td>
+                <td>{{firstName}}</td>
+                <td>{{middleInitial}}</td>
+                <td>{{lastName}}</td>
+                <td>{{dateOfBirth}}</td>
+                <td>{{dateOfEmployment}}</td>
+                <td><button type=submit formaction="/employees/{{id}}/edit">Edit</button></td>
+            </tr>
+        {{/each}}
+    </table>
+</form>

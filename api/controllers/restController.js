@@ -4,98 +4,7 @@ var mongoose = require('mongoose'),
     JWT = require('../lib/jwt');
 
 Employee = mongoose.model('Employee');
-
-function isEmployeeRecordValid(res, emp, id_required) {
-    "use strict";
-    var fieldCount = 6;
-    var err = null;
-
-    ['dateOfBirth', 'firstName', 'lastName', 'bStatus', 'username', 'email'].forEach(function (key) {
-        if (!(key in emp) || !emp[key]) {
-            err = {errorcode: errorCode.CANNOT_INSERT_MISSING_FIELDS, error: key + ' is missing', id: null};
-        } // Required field(s) do not exist
-    });
-    if(err) {res.json(err); return false;}
-
-    if (id_required) {
-        if (!emp._id) {
-            res.json({errorcode: errorCode.CANNOT_INSERT_MISSING_FIELDS, error: 'id is missing', id: null});
-            return false;
-        }
-        fieldCount++;
-    }
-    else if ("_id" in emp) {
-        res.json({errorcode: errorCode.UNKNOWN_ERROR, error: 'id not allowed', id: null});
-    }
-
-    ['middleInitial', 'dateOfEmployment'].forEach(function (key) {
-        if (key in emp) fieldCount++; // Optional fields do exist
-    });
-
-    if (Object.keys(emp).length !== fieldCount) {
-        res.json({errorcode: errorCode.CANNOT_INSERT_UNKNOWN_FIELDS, error: 'Too many keys in object', id: null});
-        return false; // Too many fields
-    }
-
-    if((typeof emp.dateOfBirth === 'string' && isNaN((new Date(emp.dateOfBirth)).getTime())) ||
-        (typeof emp.dateOfBirth === '[Object Date]') && isNaN(emp.dateOfBirth.getTime()) ||
-        (!emp.dateOfBirth || (typeof emp.dateOfBirth !== 'string' && typeof emp.dateOfBirth !== '[Object Date]')))
-    {
-        res.json({errorcode: errorCode.UNKNOWN_ERROR, error: 'Invalid date of birth', id: null});
-        return false;
-    }
-
-    if(emp.dateOfEmployment) {
-        if ((typeof emp.dateOfEmployment === 'string' && isNaN((new Date(emp.dateOfEmployment)).getTime())) ||
-            (typeof emp.dateOfEmployment === '[Object Date]') && isNaN(emp.dateOfEmployment.getTime()) ||
-            (typeof emp.dateOfEmployment !== 'string' && typeof emp.dateOfEmployment !== '[Object Date]')) {
-            res.json({errorcode: errorCode.UNKNOWN_ERROR, error: 'Invalid date of employment', id: null});
-            return false;
-        }
-    }
-
-    if(emp.bStatus !== 'ACTIVE' && emp.bStatus !== 'INACTIVE')
-    {
-        res.json({errorcode: errorCode.UNKNOWN_ERROR, error: 'Invalid status', id: null});
-        return false;
-    }
-
-    return true;
-}
-
-/*
-function isAuthorized2(req, res, role)
-{
-    "use strict";
-    var token = req.headers['authorization'];
-    if(token)
-    {
-        var checkJwt = new JWT(token);
-        if(!checkJwt.isValid()) {
-            res.json({errorcode: checkJwt.errorcode, error: checkJwt.error, id: null});
-            return [false, null];
-        }
-
-        if(!role || checkJwt.isInRole(role))
-            return [true, checkJwt.payload.username];
-        else
-        {
-            res.json({ errorcode: errorCode.NOT_AUTHORIZED_FOR_OPERATION, error: "Not authorized", id: null });
-            return [false, null];
-        }
-    }
-    else
-    {
-        res.json({ errorcode: errorCode.NO_AUTHORIZATION_TOKEN, error: "No authorization token", id: null });
-        return [false, null];
-    }
-}
-
-function isAuthorized(req, res, role)
-{
-    return isAuthorized2(req, res, role)[0];
-}
-*/
+var isEmployeeRecordValid = require('../lib/employeevalid');
 
 exports.login = function(req, res) {
     "use strict";
@@ -105,27 +14,15 @@ exports.login = function(req, res) {
         res.json({ errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: 'Unable to login', id: null });
         return;
     }
-
-    Employee.findOne({bStatus: 'ACTIVE', username: login.username }, function(err, emp) {
-        if(err) {
-            res.json({ errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: err.message, jwt: null});
-            return;
-        }
-
-        if(!emp) { res.json({errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: 'Invalid username or password', jwt: null}); return; }
-
-        bcrypt.compare(login.password, emp.password, function(err, res2) {
-            if(!res2) { res.json({errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: "Invalid password", jwt:null } ); return; }
-            var jwt = new JWT(emp);
-            res.json({jwt: jwt.getToken(), error: null, errorcode: errorCode.NONE });
-        });
+    Employee.authenticate(login.username, login.password, function(err, emp) {
+        if(err) { res.json({errorcode: errorCode.INVALID_USERNAME_OR_PASSWORD, error: err, jwt: null}); return;}
+        var jwt = new JWT(emp);
+        res.json({jwt: jwt.getToken(), error: null, errorcode: errorCode.NONE });
     });
-
 };
 
 exports.get_emp = function(req, res) {
     "use strict";
-    //if(!isAuthorized(req, res)) return;
     Employee.findOne({bStatus: 'ACTIVE', _id: req.query.id}, function(err, employee){
         if(err)
             res.json({errorcode: errorCode.UNKNOWN_ERROR, error: err.message});
@@ -137,7 +34,6 @@ exports.get_emp = function(req, res) {
 
 exports.get_all = function(req, res) {
     "use strict";
-    //if(!isAuthorized(req, res)) return;
   Employee.find({bStatus: 'ACTIVE'}, function(err, employees) {
      if(err)
         res.json({errorcode: errorCode.UNKNOWN_ERROR, error: err.message});
@@ -150,9 +46,10 @@ exports.get_all = function(req, res) {
 
 exports.add_emp = function(req, res) {
     "use strict";
-    //if(!isAuthorized(req, res, "ROLE_ADD_EMP")) return;
     var emp = req.body;
-    if(!isEmployeeRecordValid(res, emp, false)) return;
+    var err = isEmployeeRecordValid(emp, false);
+
+    if(err) { res.json(err); return; }
     //
     // This doesn't appear to be transactional to me. What's stopping another thread from
     // adding this employee after we do our find and before we do our save? Nothing that I know of...
@@ -182,7 +79,6 @@ exports.add_emp = function(req, res) {
                 else
                     res.json( { errorcode: errorCode.NONE, error: null, id: emp._id });
             });
-//            res.json({ errorcode: errorCode.NONE, error: null, id: newEmp._id });
         }
         else if(err)
         {
@@ -199,7 +95,8 @@ exports.update_emp = function(req, res) {
     "use strict";
     var emp = req.body;
 
-    if(!isEmployeeRecordValid(res, emp, true)) return;
+    var err = isEmployeeRecordValid(res, emp, true);
+    if(err) { res.json(err); return; }
 
     //
     // Make sure mongoose knows to delete the fields
@@ -222,7 +119,6 @@ exports.update_emp = function(req, res) {
 
 exports.delete_emp = function(req, res) {
     "use strict";
-    //if(!isAuthorized(req, res, "ROLE_DELETE_EMP")) return;
     var id = req.query.id;
     Employee.findOneAndUpdate({_id: id, bStatus: 'ACTIVE'}, {bStatus: 'INACTIVE'}, {upsert: false}, function(err, updated) {
         if(err)

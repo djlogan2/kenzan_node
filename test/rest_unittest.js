@@ -1,12 +1,12 @@
-var Client = require('./restclient');
+var Client = require('../api/lib/restclient');
 var assert = require('assert');
 var errorCode = require('../api/lib/errorcode');
 var _ = require('underscore');
 var JWT = require('../api/lib/jwt');
 
 //var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 12345678;  //    Java/Tomcat
-//var URL = "http://localhost:3000/rest"; var DB_ID = 12345678;             //    Ruby server
-var URL = "http://localhost:3000"; var DB_ID = '59ece620be2b19821cfba9ec';             //    Our node.js server
+var URL = "http://192.168.1.69:3000/rest"; var DB_ID = 12345678;             //    Ruby server
+//var URL = "http://localhost:3000/rest"; var DB_ID = '59ece620be2b19821cfba9ec';             //    Our node.js server
 //var URL = "http://192.168.1.101:65376/rest";  DB_ID = 12345678;    //    Windows C#
 
 var RestClient = require('node-rest-client').Client;
@@ -19,8 +19,8 @@ var testno = 0;
 function optionalCompare(key, e1, e2, compare) {
     "use strict";
     if (!(key in e1) && !(key in e2)) return true;
-    if (!(key in e1) && (key in e2) && e2.key === null) return true;
-    if (!(key in e2) && (key in e1) && e1.key === null) return true;
+    if (!(key in e1) && (key in e2) && e2[key] === null) return true;
+    if (!(key in e2) && (key in e1) && e1[key] === null) return true;
     if (!(key in e1) && (key in e2)) return false;
     if (!(key in e2) && (key in e1)) return false;
     if (compare) return compare(e1[key], e2[key]); else return (e1[key] === e2[key]);
@@ -42,18 +42,23 @@ function areEmployeeRecordsEqual(e1, e2) {
     );
 }
 
+var dob = new Date(1980, 0, 1);
+var doe = new Date(1990, 0, 1);
+var mi = 0;
+
 function newEmployee(prefix) {
     "use strict";
     var emp = {
         username: "user" + prefix + testno,
         email: 'user' + prefix + testno + '@kenzan.com',
-        dateOfBirth: new Date(),
-        dateOfEmployment: new Date(),
+        dateOfBirth: dob,
+        dateOfEmployment: doe,
         bStatus: 'ACTIVE',
         firstName: 'fn' + prefix + testno,
-        middleInitial: 'X',
+        middleInitial: String.fromCharCode(65 + (mi++)),
         lastName: 'ln' + prefix + testno
     };
+
     //
     // Just make sure we are at midnight to help with future
     // comparisons, since Javascript has no "date without time"
@@ -61,6 +66,10 @@ function newEmployee(prefix) {
     //
     emp.dateOfBirth.setHours(0, 0, 0, 0);
     emp.dateOfEmployment.setHours(0, 0, 0, 0);
+
+    dob.setDate(dob.getDate() + 1);
+    doe.setDate(doe.getDate() + 1);
+
     testno++;
     return emp;
 }
@@ -105,6 +114,49 @@ describe('Rest server', function () {
             addNewEmployee('get1', function(added_employee){
                 login('kenzan', 'kenzan', function (clientuser2) {
                     clientuser2.getEmployee(added_employee.id, function (get_employee) {
+                        assert.notEqual(get_employee, null);
+                        assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
+                        done();
+                    });
+                });
+            });
+        });
+
+        ['id', 'username', 'firstName', 'middleInitial', 'lastName', 'dateOfBirth', 'dateOfEmployment'].forEach(function(key){
+            it('should find a record by ' + key, function(done){
+                addNewEmployee('get4', function(added_employee){
+                    login('kenzan', 'kenzan', function (clientuser2) {
+                        var find = {};
+                        find[key] = added_employee[key];
+                        clientuser2.getEmployee(find, function (get_employee) {
+                            assert.notEqual(get_employee, null);
+                            assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+
+        it('should fail if the variable(s) would return duplicate records', function(done){
+            addNewEmployee('get5', function(added_employee){
+                login('kenzanadu', 'kenzan', function (clientuser2) {
+                    added_employee.username = 'get5dup';
+                    delete added_employee.id;
+                    clientuser2.addEmployee(added_employee, function(){
+                        clientuser2.getEmployee({firstName: added_employee.firstName}, function (get_employee) {
+                            assert.equal(get_employee, null);
+                            done();
+                        });
+                    });
+                });
+            });
+        });
+        it('should find a record using multiple fields', function(done){
+            addNewEmployee('get4', function(added_employee){
+                login('kenzan', 'kenzan', function (clientuser2) {
+                    clientuser2.getEmployee({firstName: added_employee.firstName, lastName: added_employee.lastName}, function (get_employee) {
+                        assert.notEqual(get_employee, null);
                         assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
                         done();
                     });
@@ -1113,7 +1165,7 @@ describe('Rest server', function () {
                                     assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                                     assert.notEqual(data.error, null, 'error field should not be null');
                                     assert.equal(data.errorcode, errorCode.INVALID_USERNAME_OR_PASSWORD, 'error code should indicate invalid password');
-                                    login(emp.username, 'someotherpassword', done); // This should pass if we can login!
+                                    login(emp.username, 'someotherpassword', function(data){done()}); // This should pass if we can login!
                                 });
                             });
                         });

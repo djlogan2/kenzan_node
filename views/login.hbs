@@ -1,0 +1,19 @@
+<h1>Login</h1>
+{{#form url method='post' class='form'}}
+    <table>
+        <tr>
+            <td>{{label 'username' 'Username'}}</td>
+            <td>{{input 'username' username}}</td>
+        </tr>
+        <tr>
+            <td>{{label 'password' 'Password'}}</td>
+            <td>{{password 'password' password}}</td>
+        </tr>
+        <tr>
+            <td>
+                {{submit 'login' 'Login'}}
+            </td>
+        </tr>
+    </table>
+    {{hidden 'redirect' redirect}}
+{{/form}}
