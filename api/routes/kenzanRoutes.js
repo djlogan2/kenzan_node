@@ -16,6 +16,10 @@ module.exports = function(app) {
 
     //
     // Match the same URL patterns Ruby uses
+    // Update: We can't without javascript. Ruby uses magic under the covers
+    //  in order to send 'DELETE', 'PATCH', and 'PUT' requests. We could do the
+    //  same, but there really is no need. Just use the standard 'GET' and 'POST'
+    //  methods.
     //
     app.route('/employees').get(htmlController.index);
     app.route('/employees').post(htmlController.create);
@@ -27,5 +31,6 @@ module.exports = function(app) {
     app.route('/employees/:id/edit').get(htmlController.edit);
     app.route('/employees/:id/edit').post(htmlController.update); // Ruby uses 'PUT', which isn't allowed via the HTML spec. So Ruby must be doing something cool under the covers. Go figure.
 
-    app.route('/employees/:id/delete').get(htmlController.destroy); // Delete isn't allowed either. Only GET and POST.
+    //Moved this to the update method (post:save)
+    //app.route('/employees/:id/delete').get(htmlController.destroy); // Delete isn't allowed either. Only GET and POST.
 }

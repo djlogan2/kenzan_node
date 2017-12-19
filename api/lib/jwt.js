@@ -52,8 +52,8 @@ function JWTToken(token_or_employeeRecord) {
             return;
         }
 
-        this.payload.exp = new Date(this.payload.exp);
-        this.payload.atIssued = new Date(this.payload.atIssued);
+        this.payload.exp = new LocalDate(this.payload.exp);
+        this.payload.atIssued = new LocalDate(this.payload.atIssued);
 
         if(Object.prototype.toString.call(this.payload.atIssued) !== '[object Date]' || isNaN(this.payload.atIssued.getTime())) {
             this.error = "Invalid issue date in token payload";

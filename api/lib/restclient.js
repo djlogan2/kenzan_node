@@ -1,27 +1,33 @@
-var Client = require('node-rest-client').Client;
-var client = new Client();
-var ErrorCode = require('./errorcode');
+const Client = require('node-rest-client').Client;
+const client = new Client();
+const ErrorCode = require('./errorcode');
+const LocalDate = require('js-joda').LocalDate;
 
-var validParser = {
+const validParser = {
     name: "JSON",
     isDefault: false,
-    match: function (response) {
+    match: function (/*response*/) {
         return true; //response.headers["nothing"]==="nothing";
     },
     parse: function (byteBuffer, nrcEventEmitter, parsedCallback) {
         "use strict";
-        var parsedData = null;
+        let parsedData = null;
         try {
             if(byteBuffer.length !== 0) {
-                parsedData = JSON.parse(byteBuffer.toString());
+                try {
+                    parsedData = JSON.parse(byteBuffer.toString());
+                } catch (e) {
+                    console.dir(e);
+                    console.dir(byteBuffer.toString());
+                }
 
                 if(parsedData) {
                     if (parsedData.dateOfBirth /*"dateOfBirth" in parsedData*/) {
-                        parsedData.dateOfBirth = new Date(parsedData.dateOfBirth);
+                        parsedData.dateOfBirth = LocalDate.parse(parsedData.dateOfBirth);
                     }
 
                     if (parsedData.dateOfEmployment /*"dateOfEmployment" in parsedData*/) {
-                        parsedData.dateOfEmployment = new Date(parsedData.dateOfEmployment);
+                        parsedData.dateOfEmployment = LocalDate.parse(parsedData.dateOfEmployment);
                     }
                 }
 
@@ -39,13 +45,13 @@ client.parsers.add(validParser);
 function RestClient(url, type) {
     "use strict";
     this.url = url;
-    var prefix = 'c_';
+    let prefix = 'c_';
     if(type === 'promises') prefix = 'p_';
-    for(var attr in this)
+    for (const attr in this)
     {
         if(attr.indexOf(prefix) === 0)
         {
-            var newProperty = attr.substr(prefix.length);
+            const newProperty = attr.substr(prefix.length);
             this[newProperty] = this[attr];
         }
     }
@@ -54,13 +60,13 @@ function RestClient(url, type) {
 RestClient.prototype.promise_X = function() {
     "use strict";
 
-    var args = [].slice.call(arguments);
-    var self = this;
-    var restFunction = args.shift();
+    const args = [].slice.call(arguments);
+    const self = this;
+    const restFunction = args.shift();
 
     return new Promise(function(resolve, reject){
         args.push(function(data){
-            if(data.errorcode && data.errorcode !== ErrorCode.NONE)
+            if (data && data.errorcode && data.errorcode !== ErrorCode.NONE)
                 reject(data);
             else
                 resolve(data);
@@ -72,7 +78,7 @@ RestClient.prototype.promise_X = function() {
 
 RestClient.prototype.c_login = function (username, password, done) {
     "use strict";
-    var self = this;
+    const self = this;
     client.post(this.url + "/login", {
         data: {username: username, password: password},
         headers: {"Content-Type": "application/json"}
@@ -90,15 +96,15 @@ RestClient.prototype.p_login = function(username, password) {
 
 RestClient.prototype.c_getEmployee = function (data, done) {
     "use strict";
-    var parameters = '';
+    let parameters = '';
     if(typeof data !== 'object')
     {
         parameters = 'id=' + data;
     }
     else
     {
-        var ampersand = '';
-        for(var key in data)
+        let ampersand = '';
+        for (const key in data)
         {
             parameters += ampersand + key + '=' + encodeURI(data[key]);
             ampersand = '&';

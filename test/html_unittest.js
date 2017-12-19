@@ -1,132 +1,474 @@
-var assert = require('assert'),
-    webdriver = require('selenium-webdriver');
+"use strict";
+const assert = require('assert'),
+    Browser = require('zombie'),
+    RestClient = require('../api/lib/restclient'),
+    //restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises'),
+    Client = require('node-rest-client').Client,
+    client = new Client(),
+    Helpers = require('./helpers'),
+    _ = require('underscore'),
+    LocalDate = require('js-joda').LocalDate;
 
-var By = webdriver.By;
-var until = webdriver.until;
-var driver = new webdriver.Builder().forBrowser('chrome').build();
-var RestClient = require('../api/lib/restclient');
-var restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
-var _ = require('underscore');
-
-var kenzan_id = {};
-var getId = function(username) {
+const username_suffixes = ['', 'a', 'ad', 'au', 'd', 'du', 'u', 'adu'];
+const kenzan_id = {};
+const getId = function (username) {
     "use strict";
-    return new Promise(function(resolve, reject){
-        if(kenzan_id[username]) {
+    const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+    return new Promise(function (resolve, reject) {
+        if (kenzan_id[username]) {
             resolve(kenzan_id[username]);
             return;
         }
         restclient.login('kenzanadu', 'kenzan')
-            .then(function () {
-                return restclient.getEmployee({username: username})
-            })
-            .then(function (employee) {
-                kenzan_id[username] = employee.id;
-                resolve(employee.id);
-            })
-            .catch(function (err) {
-                "use strict";
-                console.log('Unable to run tests: ' + err);
-            });
+            .then(() => restclient.getEmployee({username: username})
+                .then(function (employee) {
+                    kenzan_id[username] = employee.id;
+                    resolve(employee.id);
+                }))
     });
+};
+
+const addEmployee = function (prefix) {
+    "use strict";
+    const emp = Helpers.newEmployee(prefix);
+    const client = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+    return client.login('kenzanp', 'kenzan').then(() => client.addEmployee(emp));
+};
+
+const login = function (browser, url, username) {
+    "use strict";
+    console.log('login(' + url + '   ' + username + ')');
+    return browser.visit(url)
+        .then(function () {
+            console.log('login then function');
+            browser.assert.element('form input[id=employee_username]');
+            browser.assert.element('form input[id=employee_password]');
+            browser.assert.element('form input[name=commit]');
+            return browser
+                .fill('[id=employee_username]', username)
+                .fill('[id=employee_password]', 'kenzan')
+                .pressButton('[name=commit]');
+        });
+};
+
+const logout = function (browser) {
+    "use strict";
+    return browser.clickLink('Logout');
 };
 
 describe('If a user is not logged in', function () {
     "use strict";
     ['', '/employees', '/employees/new', '/employees/1234', '/employees/1234/edit'/*, '/employees/1234/delete'*/].forEach(function (route) {
+
         it('should take me to the login screen when trying to go to ' + route, function (done) {
-            driver.get('http://192.168.1.69:3000' + route)
+            const browser = new Browser();
+            browser.visit('http://192.168.1.69:3000' + route)
                 .then(function () {
-                    driver.findElement(By.id('employee_username'))
+                    browser.assert.element('form');
+                    browser.assert.element('form input[id=employee_username]');
+                    browser.assert.element('form input[id=employee_password]');
+                    browser.assert.element('form input[name=commit]');
+                    done();
                 })
-                .then(done)
-                .catch(assert.fail);
+        });
+        /*
+                it.skip('should fail with a direct post of a new record', function (done) {
+                    const browser = new Browser();
+                });
+
+                it.skip('should fail with a direct delete of a record', function (done) {
+                });
+                it.skip('should fail with a direct post of an updated record', function (done) {
+                });
+            });
+            */
+    });
+});
+
+username_suffixes.forEach(function (username_suffix) {
+    describe('kenzan' + username_suffix, function () {
+
+        const browser = new Browser();
+
+        ['/', '/employees'].forEach(function (route) {
+            "use strict";
+            it('should have access to ' + route, function (done) {
+                login(browser, 'http://192.168.1.69:3000' + route, 'kenzan' + username_suffix)
+                    .then(function () {
+                        browser.assert.attribute('div [id=test_automation]', 'name', 'Employee#index');
+                        logout(browser).then(done);
+                    });
+            });
+        });
+
+        [['/new', 'a', 'new'], ['/%d/edit', 'u', 'edit']].forEach(function (one) {
+            let urlsuffix = one[0];
+            const authletter = one[1],
+                autoname = one[2];
+            it('should' + (username_suffix.indexOf(authletter) === -1 ? ' not ' : ' ') + ' allow access to ' + urlsuffix, function (done) {
+                "use strict";
+                getId('kenzan')
+                    .then(function (id) {
+                        urlsuffix = urlsuffix.replace('%d', id);
+                        return login(browser, 'http://192.168.1.69:3000/employees' + urlsuffix, 'kenzan' + username_suffix);
+                    })
+                    .then(function (err) {
+                        browser.assert.attribute('div [id=test_automation]', 'name', 'Employee#' + (username_suffix.indexOf(authletter) === -1 ? 'index' : autoname));
+                        return logout(browser);
+                    }).then(done);
+            });
         });
     });
 });
 
-describe('', function(){
+describe('Viewing all records', function () {
     "use strict";
+    it('should have all fields except pw and roles', function (done) {
+        const browser = new Browser();
+        login(browser, 'http://192.168.1.69:3000', 'kenzanp')
+            .then(function () {
+                const headers = ['username', 'Email', 'First name', 'MI', 'Last name', 'Date of birth', 'Date of employment'];
+                const nodes = browser.querySelectorAll('th');
+                for (let x = 0; x < headers.length; x++)
+                    assert.equal(nodes[x].textContent, headers[x]);
+                assert.equal(headers.length, nodes.length);
+                done();
+            })
+    });
+    it('should have the edit button if user is able to edit', function (done) {
+        const browser = new Browser();
+        login(browser, 'http://192.168.1.69:3000', 'kenzanp')
+            .then(function () {
+                assert.equal(browser.querySelector('input[type=submit]').value, 'Edit');
+                done();
+            })
+    });
+    it('should have a delete button if user is able to delete but not edit', function (done) {
+        const browser = new Browser();
+        login(browser, 'http://192.168.1.69:3000', 'kenzand')
+            .then(function () {
+                assert.equal(browser.querySelector('input[type=submit]').value, 'Delete');
+                done();
+            })
+    });
+    it('should have no button if user has neither edit nor delete', function (done) {
+        const browser = new Browser();
+        login(browser, 'http://192.168.1.69:3000', 'kenzan')
+            .then(function () {
+                assert.equal(browser.querySelectorAll('input[type=submit]').length, 0);
+                done();
+            })
+    });
+});
 
-    ['', 'a', 'ad', 'au', 'd', 'du', 'u', 'adu'].forEach(function (username_suffix) {
-        describe('kenzan' + username_suffix, function () {
-
-            var login = function (route) {
-                return driver.get('http://192.168.1.69:3000' + route)
-                    .then(function () {
-                        return driver.findElement(By.id('employee_username'))
-                    })
-                    .then(function (e1) {
-                        return e1.sendKeys('kenzan' + username_suffix)
-                    })
-                    .then(function () {
-                        return driver.findElement(By.id('employee_password'))
-                    })
-                    .then(function (e1) {
-                        return e1.sendKeys('kenzan')
-                    })
-                    .then(function () {
-                        return driver.findElement(By.id('new_employee'))
-                    })
-                    .then(function (e1) {
-                        return e1.submit();
-                    })
-                    .catch(assert.fail);
-            };
-
-            var logout = function () {
-                return driver.findElement(By.linkText('Logout'))
-                    .then(function (e1) {
-                        e1.click()
-                    })
-                    .catch(assert.fail);
-            };
-
-            ['/', '/employees'].forEach(function (route) {
-                "use strict";
-                it('should have access to ' + route, function (done) {
-                    login(route)
-                        .then(function () {
-                            return driver.findElement(By.id('test_automation'))
-                        })
-                        .then(function (e1) {
-                            return e1.getAttribute('name')
-                        })
-                        .then(function (e1) {
-                            assert.equal(e1, 'Employee#index');
-                        })
-                        .then(logout)
-                        .then(done)
-                        .catch(assert.fail);
+describe('Viewing a single record', function () {
+    "use strict";
+    it('should have all fields', function (done) {
+        const labels = ['Username', 'First name', 'M', 'Last name', 'Date of birth', 'Date of employment'];
+        const browser = new Browser();
+        getId('kenzan')
+            .then(function (id) {
+                return login(browser, 'http://192.168.1.69:3000/employees/' + id + '/edit', 'kenzanp')
+            })
+            .then(function () {
+                const nodes = browser.querySelectorAll('label');
+                labels.forEach(function (label) {
+                    assert.notEqual(_.find(nodes, function (node) {
+                        return node.textContent === label
+                    }), null, 'Unable to find a label for ' + label);
                 });
+                done();
             });
+    });
 
-            [['/new', 'a', 'new'], ['/%d/edit', 'u', 'edit']].forEach(function (one) {
-                var urlsuffix = one[0],
-                    authletter = one[1],
-                    autoname = one[2];
-                it('should' + (username_suffix.indexOf(authletter) === -1 ? ' not ' : ' ') + ' allow access to ' + urlsuffix, function (done) {
-                    getId('kenzanadu')
-                        .then(function(id){
-                            return login('/employees' + urlsuffix.replace('%d', id))
-                        })
-                        .then(function () {
-                            return driver.findElement(By.id('test_automation'))
-                        })
-                        .then(function (e1) {
-                            return e1.getAttribute('name')
-                        })
-                        .then(function (e1) {
-                            if (username_suffix.indexOf(authletter) === -1)
-                                assert.equal(e1, 'Employee#index');
-                            else
-                                assert.equal(e1, 'Employee#' + autoname)
-                        })
-                        .then(logout)
-                        .then(done)
-                        .catch(assert.fail);
-                });
+    it('should not have password in text box even if user has authority to change it', function (done) {
+        const browser = new Browser();
+        getId('kenzan')
+            .then(function (id) {
+                return login(browser, 'http://192.168.1.69:3000/employees/' + id + '/edit', 'kenzanp')
+            })
+            .then(function () {
+                const pwnode = browser.querySelector('input[id=employee_password]');
+                assert.notEqual(pwnode, null, 'Unable to find password field');
+                assert.ok(!pwnode.value, 'Why does the password field have data in it?');
+                done();
             });
+    });
+
+    it('should have roles if user has authority to view them', function (done) {
+        const browser = new Browser();
+        getId('kenzan')
+            .then(function (id) {
+                return login(browser, 'http://192.168.1.69:3000/employees/' + id + '/edit', 'kenzanp')
+            })
+            .then(function () {
+                browser.assert.element('select[id=employee_role]');
+                done();
+            });
+    });
+
+    it('should not have roles if user does not have authority to view them', function (done) {
+        const browser = new Browser();
+        getId('kenzan')
+            .then(function (id) {
+                return login(browser, 'http://192.168.1.69:3000/employees/' + id + '/edit', 'kenzanadu')
+            })
+            .then(function () {
+                browser.assert.elements('option', 0);
+                done();
+            });
+    });
+
+    it('should have the right roles and only assigned roles', function () {
+        const authorities = {
+            a: 'ROLE_ADD_EMP',
+            u: 'ROLE_UPDATE_EMP',
+            d: 'ROLE_DELETE_EMP',
+            p: 'ROLE_SET_PASSWORD',
+        };
+        const getRoles = function (suffix) {
+            const roles = [];
+            for (let letter in authorities) {
+                if (suffix.indexOf(letter) !== -1) roles.push(authorities[letter]);
+            }
+            return roles;
+        };
+        username_suffixes.forEach(function (suffix) {
+            const browser = new Browser();
+            getId('kenzan' + suffix)
+                .then(id => login(browser, 'http://192.168.1.69:3000/employees/' + id, 'kenzan' + suffix))
+                .then(function () {
+                    const roles = getRoles(suffix);
+                    const options = browser.querySelectorAll('option');
+                    assert.equal(options.length, roles.length);
+                    let count = roles.length;
+                    roles.forEach(function (role) {
+                        assert.notEqual(_.find(options, function (option) {
+                            return (option.textContent === role)
+                        }), null, 'Unable to find role ' + role);
+                        count--;
+                    });
+                    assert.equal(count, 0, 'Extra roles found');
+                    return logout();
+                })
+                .then(function () {
+                    if (suffix === _.last(username_suffixes)) done();
+                });
         });
+    });
+});
+
+describe('Adding a new record', function () {
+    "use strict";
+    it('should not have a password field if a user does not have privileges', function (done) {
+        const browser = new Browser();
+        login(browser, 'http://192.168.1.69:3000/employees/new', 'kenzanadu')
+            .then(function (err) {
+                console.dir(browser.html());
+                browser.assert.elements('input[id=employee_password]', 0);
+                browser.assert.elements('select[id=employee_role]', 0);
+                done();
+            }).catch(function (e) {
+            assert.fail(e);
+            done();
+        })
+
+    });
+
+    it('should have a password field if a user does have privileges', function (done) {
+        const browser = new Browser();
+        login(browser, 'http://192.168.1.69:3000/employees/new', 'kenzanp')
+            .then(function (err) {
+                browser.assert.element('input[id=employee_password]');
+                browser.assert.element('select[id=employee_role]');
+                done();
+            }).catch(function (e) {
+            assert.fail(e);
+            done();
+        });
+    });
+
+    it('should save all of the fields appropriately', function (done) {
+        const browser = new Browser();
+        const emp = Helpers.newEmployee('add1');
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        emp.password = 'this_is_a_password';
+        login(browser, 'http://192.168.1.69:3000/employees/new', 'kenzanp')
+            .then(function () {
+                for (let key in emp)
+                    if (key !== 'bStatus')
+                        browser.fill('[id=employee_' + key + ']', emp[key]);
+                return browser.pressButton('[name=commit]');
+            }).then(function () {
+            browser.assert.attribute('div [id=test_automation]', 'name', 'Employee#show');
+            return restclient.login('kenzan', 'kenzan');
+        }).then(() => restclient.getEmployee({username: emp.username}))
+            .then(function (addedEmp) {
+                assert(Helpers.areEmployeeRecordsEqual(addedEmp, emp), 'Employee records are not equal');
+                return restclient.login(emp.username, 'this_is_a_password');
+            }).then(function (err) {
+            assert.ok(err, err);
+            done();
+        }).catch(function (e) {
+            assert.fail(e);
+            done();
+        });
+    });
+
+    it('should not work with a direct post if user does not have privileges', function (done) {
+        const browser_sufficient = new Browser();
+        const browser_insufficient = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        let emp;
+        let emp_temp;
+        addEmployee('post2')
+            .then(function (ret) {
+                emp_temp = ret;
+                return restclient.login('kenzan', 'kenzan');
+            })
+            .then(function () {
+                const promise1 = login(browser_insufficient, 'http://192.168.1.69:3000/employees/' + emp_temp.id + '/edit', 'kenzanu');
+                const promise2 = login(browser_sufficient, 'http://192.168.1.69:3000/employees/new', 'kenzana');
+                return Promise.all([promise1, promise2]);
+            }).then(function () {
+            browser_sufficient.deleteCookies();
+            browser_insufficient.cookies.forEach(function (cookie) {
+                cookie.name = cookie.key;
+                delete cookie.key;
+                browser_sufficient.setCookie(cookie);
+            });
+            browser_sufficient.fill('[name=authenticity_token]', browser_insufficient.querySelector('[name=authenticity_token]').value);
+            emp = Helpers.newEmployee('post3');
+            for (let key in emp)
+                if (key !== 'bStatus' && key !== 'password')
+                    browser_sufficient.fill('[id=employee_' + key + ']', emp[key]);
+            return browser_sufficient.pressButton('[name=commit]');
+        }).then(function () {
+            browser_sufficient.assert.attribute('div [id=test_automation]', 'name', 'Employee#index');
+            return restclient.getEmployee({username: emp.username});
+        }).then(function (emp_to_check) {
+            assert.equal(emp_to_check, null, 'Add should not have been allowed');
+            done();
+        }).catch(function (e) {
+            assert.fail(e);
+            done();
+        });
+    });
+});
+
+describe('Updating a record', function () {
+    "use strict";
+    it('should have all of the standard fields', function (done) {
+        const browser = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        const emp = Helpers.newEmployee('update1');
+        restclient.login('kenzana', 'kenzan')
+            .then(() => restclient.addEmployee(emp))
+            .then(ret => login(browser, 'http://192.168.1.69:3000/employees/' + ret.id + '/edit?', 'kenzanu'))
+            .then(function () {
+                browser.assert.element('[id=employee_username]');
+                browser.assert.element('[id=employee_email]');
+                browser.assert.element('[id=employee_firstName]');
+                browser.assert.element('[id=employee_middleInitial]');
+                browser.assert.element('[id=employee_lastName]');
+                browser.assert.element('[id=employee_dateOfBirth]');
+                browser.assert.element('[id=employee_dateOfEmployment]');
+                done();
+            }).catch(function (e) {
+            console.log(e);
+            assert.fail(e);
+        });
+    });
+
+    it('should have all of the standard fields filled in appropriately', function (done) {
+        const browser = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        const emp = Helpers.newEmployee('update2');
+        restclient.login('kenzana', 'kenzan')
+            .then(() => restclient.addEmployee(emp))
+            .then(ret => login(browser, 'http://192.168.1.69:3000/employees/' + ret.id + '/edit?', 'kenzanu'))
+            .then(function () {
+                for (let key in emp) {
+                    if (key !== 'bStatus' && key !== 'password')
+                        if (key.indexOf('date') > -1)
+                            assert.ok(LocalDate.parse(browser.querySelector('[id=employee_' + key + ']').value).equals(emp[key]));
+                        else
+                            assert.equal(browser.querySelector('[id=employee_' + key + ']').value, emp[key]);
+                }
+                done();
+            }).catch(function (e) {
+            console.log(e);
+            assert.ok(false);
+        });
+    });
+    it.skip('should retain all new data in all fields if there is a save error', function (done) {
+    });
+    it.skip('should not have password if user does not have authority', function (done) {
+    });
+    it.skip('should have password if user has authority', function (done) {
+    });
+    it.skip('should not have roles if user does not have authority', function (done) {
+    });
+    it.skip('should have roles if user has authority', function (done) {
+    });
+    it.skip('should never display anything in the password field', function (done) {
+    });
+    it.skip('should not change the password if password field is not filled in', function (done) {
+    });
+    it.skip('should change the password if password field is filled in', function (done) {
+    });
+    it.skip('should change the other input fields appropriately', function (done) {
+    });
+    it.skip('should delete the optional fields appropriately', function (done) {
+    });
+    it.skip('should only allow valid dates in the date fields', function (done) {
+    });
+    it.skip('should have the delete link if user has delete authority', function (done) {
+    });
+    it.skip('should not have the delete link if user does not have delete authority', function (done) {
+    });
+    it('should not work with a direct post if user does not have privileges', function (done) {
+        const browser_sufficient = new Browser();
+        const browser_insufficient = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        let id;
+        addEmployee('post1')
+            .then(function (emp) {
+                id = emp.id;
+                const promise1 = login(browser_insufficient, 'http://192.168.1.69:3000/employees/new', 'kenzana'); // Add but not update
+                const promise2 = login(browser_sufficient, 'http://192.168.1.69:3000/employees/' + emp.id + '/edit', 'kenzanu');
+                return Promise.all([promise1, promise2]);
+            }).catch(function (e) {
+            console.dir(browser_sufficient.html());
+            assert.fail(e);
+        }).then(function () {
+            browser_sufficient.deleteCookies();
+            browser_insufficient.cookies.forEach(function (cookie) {
+                cookie.name = cookie.key;
+                delete cookie.key;
+                browser_sufficient.setCookie(cookie);
+            });
+            browser_sufficient.fill('[id=employee_username]', 'should_not_be_allowed');
+            browser_sufficient.fill('[name=authenticity_token]', browser_insufficient.querySelector('[name=authenticity_token]').value);
+            return browser_sufficient.pressButton('[name=commit]');
+        }).then(function () {
+            browser_sufficient.assert.attribute('div [id=test_automation]', 'name', 'Employee#index');
+            return restclient.login('kenzan', 'kenzan');
+        }).then(() => restclient.getEmployee(id))
+            .then(function (emp_to_check) {
+                assert.notEqual(emp_to_check.username, 'should_not_be_allowed', 'Edit should not have been allowed');
+                done();
+            });
+    });
+});
+
+describe.skip('Deleting a record', function () {
+});
+
+describe.skip('security', function () {
+    "use strict";
+    it('what happens when we delete authenticity-token in a form', function (done) {
+    });
+    it('what happens when we change authenticity-token in a form to something else', function (done) {
     });
 });

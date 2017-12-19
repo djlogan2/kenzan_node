@@ -51,7 +51,7 @@ exports.update = function(req, res) {
     if('save' in emp) {
         delete emp.save;
         var error = isEmployeeRecordValid(emp, true);
-        if(error) {
+        if (error) {
             defaultError(res, error.error);
             return;
         }
@@ -62,19 +62,18 @@ exports.update = function(req, res) {
                 res.render('edit', {employee: emp, err: 'Record updated'});
             }
         })
+    } else if ('delete' in emp) {
+        Employee.findOneAndUpdate({
+            _id: emp._id,
+            bStatus: 'ACTIVE'
+        }, {bStatus: 'INACTIVE'}, {upsert: false}, function (err, updated) {
+            if (err || !updated)
+                defaultError(res, 'Unable to delete record: ' + err.toString());
+            else {
+                res.render('index', {employee: emp, err: 'Record deleted'});
+            }
+        });
     } else
         defaultError(res, "We don't know what to do with this record");
 
-};
-
-exports.destroy = function(req, res) {
-    "use strict";
-    var id = req.params.id;Employee.findOneAndUpdate({_id: id, bStatus: 'ACTIVE'}, {bStatus: 'INACTIVE'}, {upsert: false}, function(err, updated) {
-        if(err)
-            defaultError(res, 'Unable to delete' + err.toString());
-        else if(!updated)
-            defaultError(res, 'Unable to delete nonexistant record');
-        else
-            doIndex(req,res);
-    });
 };

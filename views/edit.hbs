@@ -1,6 +1,5 @@
 <h1>Employee#edit</h1>
 {{#form url method='post' class='form'}}
-
     <table>
     <tr>
         <td>{{label 'Username' 'Username'}}</td>
@@ -20,20 +19,22 @@
     </tr>
     <tr>
         <td>{{label 'Last name' 'Last name'}}</td>
-        <td>{{input 'lastName' employee.lastName }}</td>
+        <td>{{input 'lastName' employee.lastName}}</td>
     </tr>
     <tr>
         <td>{{label 'Date of birth' 'DOB'}}</td>
-        <td>{{input 'dateOfBirth' employee.dateOfBirth }}</td>
+        <td>{{input 'dateOfBirth' employee.dateOfBirth type="date" }}</td>
     </tr>
     <tr>
         <td>{{label 'Date of employment' 'DOE'}}</td>
-        <td>{{input 'dateOfEmployment' employee.dateOfEmployment }}</td>
+        <td>{{input 'dateOfEmployment' employee.dateOfEmployment type="date" }}</td>
     </tr>
-    <tr><td>{{submit 'save' 'Save'}}</td><td><a href="/employees/{{employee._id}}/delete">Delete</a></td></tr>
+        <tr>
+            <td>{{submit 'save' 'Save'}}</td>
+            <td>{{submit 'delete' 'Delete'}}></td>
+        </tr>
 </table>
     {{hidden 'bStatus' 'ACTIVE' }}
     {{hidden '_id' employee._id }}
 {{/form}}
 {{ messages }}
-

@@ -39,12 +39,14 @@ var EmployeeSchema = new Schema({
     },
 
     dateOfBirth: {
-        type: Date,
-        required: 'Please enter date of birth'
+        type: String,
+        required: 'Please enter date of birth',
+        get: date => LocalDate.parse(date)
     },
 
     dateOfEmployment: {
-        type: Date
+        type: String,
+        get: date => LocalDate.parse(date)
     },
 
     password: {
@@ -112,6 +114,8 @@ EmployeeSchema.pre('update', function(next){
     console.log('update');
 });
 */
+EmployeeSchema.path('dateOfBirth', {set: dob => dob.toString()});
+EmployeeSchema.path('dateOfEmployment', {set: doe => doe.toString()});
 EmployeeSchema.statics.authenticate = function(username, password, callback) {
     Employee.findOne({bStatus: 'ACTIVE', username: username}, function(err, emp){
         if(err || !emp) return callback(err || 'Invalid username or password');

@@ -1,82 +1,24 @@
-var Client = require('../api/lib/restclient');
-var assert = require('assert');
-var errorCode = require('../api/lib/errorcode');
-var _ = require('underscore');
-var JWT = require('../api/lib/jwt');
+var RestClient = require('../api/lib/restclient'),
+    assert = require('assert'),
+    errorCode = require('../api/lib/errorcode'),
+    _ = require('underscore'),
+    JWT = require('../api/lib/jwt'),
+    Helpers = require('./helpers'),
+    Client = require('node-rest-client').Client,
+    client = new Client(),
+    LocalDate = require('js-joda').LocalDate;
 
 //var URL = "http://localhost:8080/Kenzan/rest"; var DB_ID = 12345678;  //    Java/Tomcat
 var URL = "http://192.168.1.69:3000/rest"; var DB_ID = 12345678;             //    Ruby server
 //var URL = "http://localhost:3000/rest"; var DB_ID = '59ece620be2b19821cfba9ec';             //    Our node.js server
 //var URL = "http://192.168.1.101:65376/rest";  DB_ID = 12345678;    //    Windows C#
 
-var RestClient = require('node-rest-client').Client;
-var restclient = new RestClient();
 
 var variousUsers = ['kenzan', 'kenzana', 'kenzand', 'kenzanu', 'kenzanad', 'kenzanau', 'kenzandu', 'kenzanadu'];
 
-var testno = 0;
-
-function optionalCompare(key, e1, e2, compare) {
-    "use strict";
-    if (!(key in e1) && !(key in e2)) return true;
-    if (!(key in e1) && (key in e2) && e2[key] === null) return true;
-    if (!(key in e2) && (key in e1) && e1[key] === null) return true;
-    if (!(key in e1) && (key in e2)) return false;
-    if (!(key in e2) && (key in e1)) return false;
-    if (compare) return compare(e1[key], e2[key]); else return (e1[key] === e2[key]);
-}
-
-function areEmployeeRecordsEqual(e1, e2) {
-    "use strict";
-    return (
-        e1.username === e2.username &&
-        e1.email === e2.email &&
-        e1.firstName === e2.firstName &&
-        optionalCompare("middleInitial", e1, e2) &&
-        e1.lastName === e2.lastName &&
-        e1.bStatus === e2.bStatus &&
-        (e1.dateOfBirth && e2.dateOfBirth && e1.dateOfBirth.getTime() === e2.dateOfBirth.getTime()) &&
-        optionalCompare("dateOfEmployment", e1, e2, function (d1, d2) {
-            return d1.getTime() === d2.getTime();
-        })
-    );
-}
-
-var dob = new Date(1980, 0, 1);
-var doe = new Date(1990, 0, 1);
-var mi = 0;
-
-function newEmployee(prefix) {
-    "use strict";
-    var emp = {
-        username: "user" + prefix + testno,
-        email: 'user' + prefix + testno + '@kenzan.com',
-        dateOfBirth: dob,
-        dateOfEmployment: doe,
-        bStatus: 'ACTIVE',
-        firstName: 'fn' + prefix + testno,
-        middleInitial: String.fromCharCode(65 + (mi++)),
-        lastName: 'ln' + prefix + testno
-    };
-
-    //
-    // Just make sure we are at midnight to help with future
-    // comparisons, since Javascript has no "date without time"
-    // object.
-    //
-    emp.dateOfBirth.setHours(0, 0, 0, 0);
-    emp.dateOfEmployment.setHours(0, 0, 0, 0);
-
-    dob.setDate(dob.getDate() + 1);
-    doe.setDate(doe.getDate() + 1);
-
-    testno++;
-    return emp;
-}
-
 function login(username, password, asyncCallback) {
     "use strict";
-    var clientuser = new Client(URL);
+    var clientuser = new RestClient(URL);
     clientuser.login(username, password, function (resp) {
         assert.notEqual(resp, null, 'response should not be null');
         assert.ok("error" in resp, 'response should have an error field');
@@ -89,10 +31,10 @@ function login(username, password, asyncCallback) {
     });
 }
 
-function addNewEmployee(prefix, asyncCallback) {
+function addnewEmployee(prefix, asyncCallback) {
     "use strict";
     login('kenzanadu', 'kenzan', function (clientuser) {
-        var emp = newEmployee(prefix);
+        var emp = Helpers.newEmployee(prefix);
         clientuser.addEmployee(emp, function (resp) {
             assert.notEqual(resp, null, 'response should not be null');
             assert.ok("error" in resp, 'response should have an error field');
@@ -111,11 +53,11 @@ describe('Rest server', function () {
     describe('Getting a single record', function () {
         "use strict";
         it('should work if the user has a valid token, no roles necessary', function (done) {
-            addNewEmployee('get1', function(added_employee){
+            addnewEmployee('get1', function (added_employee) {
                 login('kenzan', 'kenzan', function (clientuser2) {
                     clientuser2.getEmployee(added_employee.id, function (get_employee) {
                         assert.notEqual(get_employee, null);
-                        assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
+                        assert.ok(Helpers.areEmployeeRecordsEqual(added_employee, get_employee));
                         done();
                     });
                 });
@@ -124,13 +66,13 @@ describe('Rest server', function () {
 
         ['id', 'username', 'firstName', 'middleInitial', 'lastName', 'dateOfBirth', 'dateOfEmployment'].forEach(function(key){
             it('should find a record by ' + key, function(done){
-                addNewEmployee('get4', function(added_employee){
+                addnewEmployee('get4', function (added_employee) {
                     login('kenzan', 'kenzan', function (clientuser2) {
                         var find = {};
                         find[key] = added_employee[key];
                         clientuser2.getEmployee(find, function (get_employee) {
                             assert.notEqual(get_employee, null);
-                            assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
+                            assert.ok(Helpers.areEmployeeRecordsEqual(added_employee, get_employee));
                             done();
                         });
                     });
@@ -139,7 +81,7 @@ describe('Rest server', function () {
         });
 
         it('should fail if the variable(s) would return duplicate records', function(done){
-            addNewEmployee('get5', function(added_employee){
+            addnewEmployee('get5', function (added_employee) {
                 login('kenzanadu', 'kenzan', function (clientuser2) {
                     added_employee.username = 'get5dup';
                     delete added_employee.id;
@@ -153,11 +95,11 @@ describe('Rest server', function () {
             });
         });
         it('should find a record using multiple fields', function(done){
-            addNewEmployee('get4', function(added_employee){
+            addnewEmployee('get4', function (added_employee) {
                 login('kenzan', 'kenzan', function (clientuser2) {
                     clientuser2.getEmployee({firstName: added_employee.firstName, lastName: added_employee.lastName}, function (get_employee) {
                         assert.notEqual(get_employee, null);
-                        assert.ok(areEmployeeRecordsEqual(added_employee, get_employee));
+                        assert.ok(Helpers.areEmployeeRecordsEqual(added_employee, get_employee));
                         done();
                     });
                 });
@@ -165,8 +107,8 @@ describe('Rest server', function () {
         });
 
         it('should fail if no token sent', function (done) {
-            addNewEmployee('get2', function(added_employee){
-                restclient.get(URL + "/get_emp?id=" + added_employee.id, {
+            addnewEmployee('get2', function (added_employee) {
+                client.get(URL + "/get_emp?id=" + added_employee.id, {
                     headers: {"Content-Type": "application/json"}
                 }, function (data) {
                     assert.notEqual(data, null, 'Response from service should not be null');
@@ -183,7 +125,7 @@ describe('Rest server', function () {
 
         it('should return null with an inactive record', function (done) {
             login('kenzanadu', 'kenzan', function (clientuser) {
-                var added_employee = newEmployee('get3');
+                var added_employee = Helpers.newEmployee('get3');
                 clientuser.addEmployee(added_employee, function (resp) {
                     added_employee.id = resp.id;
                     clientuser.deleteEmployee(added_employee.id, function () {
@@ -210,7 +152,7 @@ describe('Rest server', function () {
         });
 
         it('should fail if no token sent', function (done) {
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json"}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -224,7 +166,7 @@ describe('Rest server', function () {
 
         it('should return all active records', function (done) {
             login('kenzanadu', 'kenzan', function (clientuser) {
-                var added_employee = newEmployee('getall');
+                var added_employee = Helpers.newEmployee('getall');
                 clientuser.addEmployee(added_employee, function (resp) {
                     added_employee.id = resp.id;
                     clientuser.getAllEmployees(function (resp) {
@@ -252,7 +194,7 @@ describe('Rest server', function () {
             it('should ' + not + 'be allowed by user ' + user, function (done) {
                 "use strict";
                 login(user, "kenzan", function (clientuser) {
-                    clientuser.addEmployee(newEmployee('add1'), function (resp) {
+                    clientuser.addEmployee(Helpers.newEmployee('add1'), function (resp) {
                         assert.notEqual(resp, null, 'response should not be null');
                         assert.ok("error" in resp, 'response should have an error field');
                         assert.ok("errorcode" in resp, 'response should have an error code field');
@@ -276,7 +218,7 @@ describe('Rest server', function () {
         ["username", "email", "dateOfBirth", "firstName", "lastName", "bStatus"].forEach(function (key) {
             it('should fail without a ' + key, function (done) {
                 login("kenzana", "kenzan", function (clientuser) {
-                    var emp = newEmployee("add2");
+                    var emp = Helpers.newEmployee("add2");
                     delete emp[key];
                     clientuser.addEmployee(emp, function (resp) {
                         assert.notEqual(resp, null, 'response should not be null');
@@ -294,7 +236,7 @@ describe('Rest server', function () {
         it('should not fail without a middleInitial', function (done) {
             "use strict";
             login("kenzana", "kenzan", function (clientuser) {
-                var emp = newEmployee("add3");
+                var emp = Helpers.newEmployee("add3");
                 delete emp.middleInitial;
                 clientuser.addEmployee(emp, function (resp) {
                     assert.notEqual(resp, null, 'response should not be null');
@@ -311,7 +253,7 @@ describe('Rest server', function () {
         it('should fail with a spurious data element', function (done) {
             "use strict";
             login("kenzana", "kenzan", function (clientuser) {
-                var emp = newEmployee("add4");
+                var emp = Helpers.newEmployee("add4");
                 emp.spuriousField = 'This should fail';
                 clientuser.addEmployee(emp, function (resp) {
                     assert.notEqual(resp, null, 'response should not be null');
@@ -335,7 +277,7 @@ describe('Rest server', function () {
         it.skip('should fail with a password field', function (done) {
             "use strict";
             login("kenzana", "kenzan", function (clientuser) {
-                var emp = newEmployee("add5");
+                var emp = Helpers.newEmployee("add5");
                 emp.password = 'password string';
                 clientuser.addEmployee(emp, function (resp) {
                     assert.notEqual(resp, null, 'response should not be null');
@@ -352,7 +294,7 @@ describe('Rest server', function () {
         it('should fail if a duplicate username with an active status is in the database', function (done) {
             "use strict";
             login('kenzana', 'kenzan', function (clientuser) {
-                var emp = newEmployee('add6');
+                var emp = Helpers.newEmployee('add6');
                 clientuser.addEmployee(emp, function () {
                     clientuser.addEmployee(emp, function (resp) {
                         assert.notEqual(resp, null, 'response should not be null');
@@ -370,7 +312,7 @@ describe('Rest server', function () {
         it('should succeed if a duplicate username with an inactive status is in the database', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                var emp = newEmployee('add7');
+                var emp = Helpers.newEmployee('add7');
                 clientuser.addEmployee(emp, function (resp) {
                     clientuser.deleteEmployee(resp.id, function () {
                         clientuser.addEmployee(emp, function (resp) {
@@ -389,7 +331,7 @@ describe('Rest server', function () {
         it('should fail if no record was sent', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                restclient.post(URL + "/add_emp", {
+                client.post(URL + "/add_emp", {
                     headers: {"Content-Type": "application/json", Authorization: clientuser.jwt}
                 }, function (data) {
                     assert.notEqual(data, null, 'Response from service should not be null');
@@ -408,15 +350,15 @@ describe('Rest server', function () {
             var not = '';
             if (user.indexOf('u', 6) === -1) not = 'not ';
             it('should ' + not + 'be allowed by user ' + user, function (done) {
-                addNewEmployee('update1', function (newEmployeeRecord) {
+                addnewEmployee('update1', function (newEmployeeRecord) {
                     "use strict";
                     login(user, "kenzan", function (clientuser) {
                         var updatedRecord = _.clone(newEmployeeRecord);
                         updatedRecord.firstName = 'Changed by ' + user;
                         updatedRecord.lastName = 'Changed by ' + user;
                         updatedRecord.middleInitial = '1';
-                        updatedRecord.dateOfBirth = new Date(1950, 11, 26);
-                        updatedRecord.dateOfEmployment = new Date(1940, 12, 25);
+                        updatedRecord.dateOfBirth = LocalDate.of(1950, 11, 26);
+                        updatedRecord.dateOfEmployment = LocalDate.of(1940, 12, 25);
                         clientuser.updateEmployee(updatedRecord, function (resp) {
                             assert.notEqual(resp, null, 'response should not be null');
                             assert.ok("error" in resp, 'response should have an error field');
@@ -428,7 +370,7 @@ describe('Rest server', function () {
                                 assert.notEqual(resp.id, null, 'response id should not be null');
                                 clientuser.getEmployee(newEmployeeRecord.id, function (employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
-                                    assert.ok(areEmployeeRecordsEqual(updatedRecord, employee), 'returned record should match our updated data');
+                                    assert.ok(Helpers.areEmployeeRecordsEqual(updatedRecord, employee), 'returned record should match our updated data');
                                     done();
                                 });
                             }
@@ -437,7 +379,7 @@ describe('Rest server', function () {
                                 assert.equal(resp.errorcode, errorCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                                 clientuser.getEmployee(newEmployeeRecord.id, function (employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
-                                    assert.ok(areEmployeeRecordsEqual(newEmployeeRecord, employee), 'returned record should match the originally added data');
+                                    assert.ok(Helpers.areEmployeeRecordsEqual(newEmployeeRecord, employee), 'returned record should match the originally added data');
                                     done();
                                 });
                             }
@@ -451,7 +393,7 @@ describe('Rest server', function () {
             it('should fail if we delete the ' + key, function (done) {
                 login('kenzanadu', 'kenzan', function (clientuser) {
                     "use strict";
-                    var emp = newEmployee('update2');
+                    var emp = Helpers.newEmployee('update2');
                     clientuser.addEmployee(emp, function (resp) {
                         emp.id = resp.id;
                         delete emp[key];
@@ -473,7 +415,7 @@ describe('Rest server', function () {
                 "use strict";
                 login('kenzanadu', 'kenzan', function (clientuser) {
                     "use strict";
-                    var emp = newEmployee('update3');
+                    var emp = Helpers.newEmployee('update3');
                     clientuser.addEmployee(emp, function (resp) {
                         emp.id = resp.id;
                         delete emp[key];
@@ -484,7 +426,7 @@ describe('Rest server', function () {
                             assert.equal(data.error, null, 'error field should be null');
                             assert.equal(data.errorcode, errorCode.NONE, 'error code should indicate missing fields');
                             clientuser.getEmployee(emp.id, function (updatedEmp) {
-                                assert.ok(areEmployeeRecordsEqual(updatedEmp, emp), 'employee records should match');
+                                assert.ok(Helpers.areEmployeeRecordsEqual(updatedEmp, emp), 'employee records should match');
                                 assert.ok(!(key in updatedEmp) || updatedEmp[key] === null, key + ' should no longer be in the updated employee record');
                                 done();
                             });
@@ -500,7 +442,7 @@ describe('Rest server', function () {
                 id: DB_ID,
                 username: 'madeup',
                 email: 'madeup@madeup.com',
-                dateOfBirth: new Date(2000, 1, 1),
+                dateOfBirth: LocalDate.of(2000, 1, 1),
                 firstName: 'fn_madeup',
                 lastName: 'ln_madeup',
                 bStatus: 'ACTIVE'
@@ -520,7 +462,7 @@ describe('Rest server', function () {
         it('should fail if the record is inactive', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                var emp = newEmployee('update4');
+                var emp = Helpers.newEmployee('update4');
                 clientuser.addEmployee(emp, function (resp) {
                     emp.id = resp.id;
                     clientuser.deleteEmployee(emp.id, function () {
@@ -539,7 +481,7 @@ describe('Rest server', function () {
         it('should fail with an added spurious field', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                var emp = newEmployee('update5');
+                var emp = Helpers.newEmployee('update5');
                 clientuser.addEmployee(emp, function (resp) {
                     emp.id = resp.id;
                     emp.something = 'else';
@@ -564,7 +506,7 @@ describe('Rest server', function () {
             var not = '';
             if (user.indexOf('d', 6) === -1) not = 'not ';
             it('should ' + not + 'be allowed by user ' + user, function (done) {
-                addNewEmployee('delete1', function (newEmployeeRecord) {
+                addnewEmployee('delete1', function (newEmployeeRecord) {
                     "use strict";
                     login(user, "kenzan", function (clientuser) {
                         clientuser.deleteEmployee(newEmployeeRecord.id, function (resp) {
@@ -586,7 +528,7 @@ describe('Rest server', function () {
                                 assert.equal(resp.errorcode, errorCode.NOT_AUTHORIZED_FOR_OPERATION, 'error code should indicate user is not authorized');
                                 clientuser.getEmployee(newEmployeeRecord.id, function (employee) {
                                     assert.notEqual(employee, null, 'employee should not be null');
-                                    assert.ok(areEmployeeRecordsEqual(newEmployeeRecord, employee), 'returned record should match the original data');
+                                    assert.ok(Helpers.areEmployeeRecordsEqual(newEmployeeRecord, employee), 'returned record should match the original data');
                                     done();
                                 });
                             }
@@ -599,7 +541,7 @@ describe('Rest server', function () {
         it('should fail if the record is already inactive', function (done) {
             "use strict";
             login('kenzanadu', 'kenzan', function (clientuser) {
-                var emp = newEmployee('delete2');
+                var emp = Helpers.newEmployee('delete2');
                 clientuser.addEmployee(emp, function (resp) {
                     emp.id = resp.id;
                     clientuser.deleteEmployee(emp.id, function () {
@@ -642,7 +584,7 @@ describe('Rest server', function () {
             jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
             jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
             jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 //var resp = JSON.parse(data.toString());
@@ -664,7 +606,7 @@ describe('Rest server', function () {
             jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
             jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
             jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-            restclient.get(URL + "/get_emp?id=1", {
+            client.get(URL + "/get_emp?id=1", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -685,9 +627,9 @@ describe('Rest server', function () {
             jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
             jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
             jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-            restclient.post(URL + "/add_emp", {
+            client.post(URL + "/add_emp", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()},
-                data: newEmployee('expired1')
+                data: Helpers.newEmployee('expired1')
             }, function (data) {
                 //var resp = JSON.parse(data.toString());
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -710,7 +652,7 @@ describe('Rest server', function () {
                     jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
                     jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
                     jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-                    restclient.post(URL + "/update_emp", {
+                    client.post(URL + "/update_emp", {
                         headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()},
                         data: employee
                     }, function (data) {
@@ -734,7 +676,7 @@ describe('Rest server', function () {
             jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
             jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
             jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-            restclient.get(URL + "/delete_emp?id=1", {
+            client.get(URL + "/delete_emp?id=1", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -755,7 +697,7 @@ describe('Rest server', function () {
             jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() - 120);
             jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
             jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-            restclient.post(URL + "/update_emp", {
+            client.post(URL + "/update_emp", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()},
                 data: {username: 'kenzanadu', password: 'newpassword'}
             }, function (data) {
@@ -772,7 +714,7 @@ describe('Rest server', function () {
     describe('No authorization token', function () {
         "use strict";
         it('should not allow a get_all', function (done) {
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json"}
             }, function (data) {
                 //var resp = JSON.parse(data.toString());
@@ -786,7 +728,7 @@ describe('Rest server', function () {
         });
 
         it('should not allow a get_emp', function (done) {
-            restclient.get(URL + "/get_emp?id=1", {
+            client.get(URL + "/get_emp?id=1", {
                 headers: {"Content-Type": "application/json"}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -799,9 +741,9 @@ describe('Rest server', function () {
         });
 
         it('should not allow an add', function (done) {
-            restclient.post(URL + "/add_emp", {
+            client.post(URL + "/add_emp", {
                 headers: {"Content-Type": "application/json"},
-                data: newEmployee("noauth1")
+                data: Helpers.newEmployee("noauth1")
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
                 assert.ok("error" in data, 'error field should exist in service response');
@@ -814,8 +756,8 @@ describe('Rest server', function () {
 
         it('should not allow an update', function (done) {
             "use strict";
-            addNewEmployee("noauth2", function (emp) {
-                restclient.post(URL + "/update_emp", {
+            addnewEmployee("noauth2", function (emp) {
+                client.post(URL + "/update_emp", {
                     headers: {"Content-Type": "application/json"},
                     data: emp
                 }, function (data) {
@@ -831,8 +773,8 @@ describe('Rest server', function () {
 
         it('should not allow a delete', function (done) {
             "use strict";
-            addNewEmployee("noauth3", function (emp) {
-                restclient.get(URL + "/delete_emp?id=" + emp.id, {headers: {"Content-Type": "application/json"}},
+            addnewEmployee("noauth3", function (emp) {
+                client.get(URL + "/delete_emp?id=" + emp.id, {headers: {"Content-Type": "application/json"}},
                     function (data) {
                         assert.notEqual(data, null, 'Response from service should not be null');
                         assert.ok("error" in data, 'error field should exist in service response');
@@ -846,7 +788,7 @@ describe('Rest server', function () {
 
         it('should not allow a set password', function (done) {
             "use strict";
-            restclient.post(URL + "/set_password", {
+            client.post(URL + "/set_password", {
                 data: {username: "kenzan", password: "asdfasdfasdf"},
                 headers: {"Content-Type": "application/json"}
             }, function (data) {
@@ -873,7 +815,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.payload.iss = 'Invalid issuer';
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -891,7 +833,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.test_signing_key = 'Invalid signing key';
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -912,7 +854,7 @@ describe('Rest server', function () {
             jwt.payload.exp.setMinutes(jwt.payload.exp.getMinutes() + 60);
             jwt.payload.atIssued = new Date(jwt.payload.exp.getTime());
             jwt.payload.atIssued.setMinutes(jwt.payload.exp.getMinutes() + 60);
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -933,7 +875,7 @@ describe('Rest server', function () {
             jwt.payload.atIssued.setMinutes(jwt.payload.atIssued.getMinutes() + 120);
             jwt.payload.exp = new Date(jwt.payload.atIssued.getTime());
             jwt.payload.exp.setMinutes(jwt.payload.atIssued.getMinutes() + 60);
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -951,7 +893,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             delete jwt.payload.iss;
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -970,7 +912,7 @@ describe('Rest server', function () {
             });
             jwt.payload.exp = new Date();
             jwt.payload.exp.setMinutes(jwt.payload.exp.getMinutes() + 60);
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -989,7 +931,7 @@ describe('Rest server', function () {
             });
             jwt.payload.atIssued = new Date();
             delete jwt.payload.exp;
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1007,7 +949,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             delete jwt.header.alg;
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1025,7 +967,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.header.alg = 'SMEL'; // An abbreviation of 'SoMething ELse' :)
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1043,7 +985,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.header = null;
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1060,7 +1002,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.header = 'Not an object';
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1077,7 +1019,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.payload = null;
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1094,7 +1036,7 @@ describe('Rest server', function () {
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
             jwt.payload = 'Not an object';
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1112,7 +1054,7 @@ describe('Rest server', function () {
             });
             jwt.payload.exp = new Date();
             jwt.payload.atIssued = 'Not a date';
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1130,7 +1072,7 @@ describe('Rest server', function () {
             });
             jwt.payload.atIssued = new Date();
             jwt.payload.exp = 'Not a date';
-            restclient.get(URL + "/get_all", {
+            client.get(URL + "/get_all", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.internalGetToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1147,7 +1089,7 @@ describe('Rest server', function () {
         "use strict";
         it('should succeed if an active user sets his own password', function (done) {
             login('kenzanp', 'kenzan', function (adduser) {
-                var emp = newEmployee('password');
+                var emp = Helpers.newEmployee('password');
                 adduser.addEmployee(emp, function () {
                     adduser.setPassword(emp.username, emp.username, function () {
                         login(emp.username, emp.username, function () {
@@ -1157,7 +1099,7 @@ describe('Rest server', function () {
                                 assert.ok("errorcode" in data, 'errorcode field should exist in service response');
                                 assert.equal(data.error, null, 'error field should be null');
                                 assert.equal(data.errorcode, errorCode.NONE, 'error code should indicate success');
-                                var clientuser2 = new Client(URL);
+                                var clientuser2 = new RestClient(URL);
                                 clientuser2.login(emp.username, emp.username, function (data) {
                                     console.log('here 6');
                                     assert.notEqual(data, null, 'Response from service should not be null');
@@ -1177,7 +1119,7 @@ describe('Rest server', function () {
         // This works due to the previous test working: it('should succeed if an authorized user sets another active users password', function(done){});
         it('should fail if an authorized user sets another inactive users password', function (done) {
             login('kenzanp', 'kenzan', function (adminuser) {
-                var emp = newEmployee('pwinactive');
+                var emp = Helpers.newEmployee('pwinactive');
                 adminuser.addEmployee(emp, function (resp) {              // Add the user
                     adminuser.deleteEmployee(resp.id, function () {    // Delete the user (i.e. set inactive)
                         adminuser.setPassword(emp.username, 'doesntmatter', function (data) { // This should now fail
@@ -1195,7 +1137,7 @@ describe('Rest server', function () {
 
         it('should fail if an unauthorized user sets another active users password', function (done) {
             login('kenzana', 'kenzan', function (adminuser) {
-                var emp = newEmployee('opwnauth');
+                var emp = Helpers.newEmployee('opwnauth');
                 adminuser.addEmployee(emp, function () {              // Add the user
                     adminuser.setPassword(emp.username, 'doesntmatter', function (data) { // This should now fail
                         assert.notEqual(data, null, 'Response from service should not be null');
@@ -1214,7 +1156,7 @@ describe('Rest server', function () {
                 username: 'kenzanp',
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
-            restclient.post(URL + "/set_password", {
+            client.post(URL + "/set_password", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()},
                 data: {password: 'somethingelse'}
             }, function (data) {
@@ -1229,13 +1171,13 @@ describe('Rest server', function () {
 
         it('should fail if there is no password field on the input', function (done) {
             login('kenzana', 'kenzan', function (clientuser) {
-                var newemp = newEmployee('pass1');
+                var newemp = Helpers.newEmployee('pass1');
                 clientuser.addEmployee(newemp, function () {
                     var jwt = new JWT({
                         username: 'kenzanp',
                         roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
                     });
-                    restclient.post(URL + "/set_password", {
+                    client.post(URL + "/set_password", {
                         headers: {"Content-Type": "application/json", Authorization: jwt.getToken()},
                         data: {username: newemp.username}
                     }, function (data) {
@@ -1252,13 +1194,13 @@ describe('Rest server', function () {
 
         it('should fail if there is a spurious field on the input', function (done) {
             login('kenzana', 'kenzan', function (clientuser) {
-                var newemp = newEmployee('pass2');
+                var newemp = Helpers.newEmployee('pass2');
                 clientuser.addEmployee(newemp, function () {
                     var jwt = new JWT({
                         username: 'kenzanp',
                         roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
                     });
-                    restclient.post(URL + "/set_password", {
+                    client.post(URL + "/set_password", {
                         headers: {"Content-Type": "application/json", Authorization: jwt.getToken()},
                         data: {username: newemp.username, password: 'somethingelse', somethingelse: 'exists'}
                     }, function (data) {
@@ -1278,7 +1220,7 @@ describe('Rest server', function () {
                 username: 'kenzanp',
                 roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
             });
-            restclient.post(URL + "/set_password", {
+            client.post(URL + "/set_password", {
                 headers: {"Content-Type": "application/json", Authorization: jwt.getToken()}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');
@@ -1294,7 +1236,7 @@ describe('Rest server', function () {
     describe('Logging in', function () {
         "use strict";
         it('fails with an invalid username', function (done) {
-            var clientuser = new Client(URL);
+            var clientuser = new RestClient(URL);
             clientuser.login('asdfasdfasdfasdf', 'kenzan', function (resp) {
                 assert.notEqual(resp, null, 'response should not be null');
                 assert.ok("error" in resp, 'response should have an error field');
@@ -1308,7 +1250,7 @@ describe('Rest server', function () {
         });
 
         it('fails with an invalid password', function (done) {
-            var clientuser = new Client(URL);
+            var clientuser = new RestClient(URL);
             clientuser.login('kenzanadu', 'totallyinvalidpassword', function (resp) {
                 assert.notEqual(resp, null, 'response should not be null');
                 assert.ok("error" in resp, 'response should have an error field');
@@ -1323,12 +1265,12 @@ describe('Rest server', function () {
 
         it('fails with a valid combination on an inactive record', function (done) {
             login('kenzanp', 'kenzan', function (clientuser) {
-                var emp = newEmployee('inactivelogin');
+                var emp = Helpers.newEmployee('inactivelogin');
                 clientuser.addEmployee(emp, function (resp) {
                     var addedId = resp.id;
                     clientuser.setPassword(emp.username, 'kenzan', function () {
                         clientuser.deleteEmployee(addedId, function () {
-                            var clientuser2 = new Client(URL);
+                            var clientuser2 = new RestClient(URL);
                             clientuser2.login(emp.username, 'kenzan', function (resp) {
                                 assert.notEqual(resp, null, 'response should not be null');
                                 assert.ok("error" in resp, 'response should have an error field');
@@ -1345,7 +1287,7 @@ describe('Rest server', function () {
             });
         });
         it('should fail if username is null or missing', function (done) {
-            restclient.post(URL + "/login", {
+            client.post(URL + "/login", {
                 headers: {"Content-Type": "application/json"},
                 data: {password: 'kenan'}
             }, function (data) {
@@ -1358,7 +1300,7 @@ describe('Rest server', function () {
             });
         });
         it('should fail if password is null or missing', function (done) {
-            restclient.post(URL + "/login", {
+            client.post(URL + "/login", {
                 headers: {"Content-Type": "application/json"},
                 data: {username: 'kenan'}
             }, function (data) {
@@ -1371,7 +1313,7 @@ describe('Rest server', function () {
             });
         });
         it('should fail if there are spurious keys in the object', function (done) {
-            restclient.post(URL + "/login", {
+            client.post(URL + "/login", {
                 headers: {"Content-Type": "application/json"},
                 data: {username: 'kenzan', password: 'kenan', something: 'else'}
             }, function (data) {
@@ -1384,7 +1326,7 @@ describe('Rest server', function () {
             });
         });
         it('should fail if no object was sent', function (done) {
-            restclient.post(URL + "/login", {
+            client.post(URL + "/login", {
                 headers: {"Content-Type": "application/json"}
             }, function (data) {
                 assert.notEqual(data, null, 'Response from service should not be null');

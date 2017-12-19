@@ -11,8 +11,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP', 'ROLE_SET_PASSWORD']
 });
 
@@ -24,8 +24,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25)
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25)
 });
 
 db.employees.insert({
@@ -36,8 +36,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_ADD_EMP']
 });
 
@@ -49,8 +49,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_ADD_EMP', 'ROLE_DELETE_EMP']
 });
 
@@ -62,8 +62,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP']
 });
 
@@ -75,8 +75,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP']
 });
 
@@ -88,8 +88,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_DELETE_EMP']
 });
 
@@ -101,8 +101,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP']
 });
 
@@ -114,8 +114,8 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_UPDATE_EMP']
 });
 
@@ -127,7 +127,7 @@ db.employees.insert({
 	middleInitial: 'J',
 	bStatus: 'ACTIVE',
 	password: '$2a$10$i51OFodMCqcVjvDyQUt8IeYhtuMH7J6JqUXKwWWPCP00DcgHnIscG',
-	dateOfBirth: new Date(1968,11,26),
-	dateOfEmployment: new Date(2000,12,25),
+    dateOfBirth: LocalDate.of(1968, 11, 26),
+    dateOfEmployment: LocalDate.of(2000, 12, 25),
 	roles: ['ROLE_SET_PASSWORD', 'ROLE_ADD_EMP', 'ROLE_UPDATE_EMP', 'ROLE_DELETE_EMP']
 });
