@@ -7,7 +7,8 @@ const assert = require('assert'),
     client = new Client(),
     Helpers = require('./helpers'),
     _ = require('underscore'),
-    LocalDate = require('js-joda').LocalDate;
+    LocalDate = require('js-joda').LocalDate,
+    PSEQ = require('promise-sequential');
 
 const username_suffixes = ['', 'a', 'ad', 'au', 'd', 'du', 'u', 'adu'];
 const kenzan_id = {};
@@ -35,18 +36,18 @@ const addEmployee = function (prefix) {
     return client.login('kenzanp', 'kenzan').then(() => client.addEmployee(emp));
 };
 
-const login = function (browser, url, username) {
+const login = function (browser, url, username, password) {
     "use strict";
+    const pw = (password || 'kenzan');
     console.log('login(' + url + '   ' + username + ')');
     return browser.visit(url)
         .then(function () {
-            console.log('login then function');
             browser.assert.element('form input[id=employee_username]');
             browser.assert.element('form input[id=employee_password]');
             browser.assert.element('form input[name=commit]');
             return browser
                 .fill('[id=employee_username]', username)
-                .fill('[id=employee_password]', 'kenzan')
+                .fill('[id=employee_password]', pw)
                 .pressButton('[name=commit]');
         });
 };
@@ -155,7 +156,7 @@ describe('Viewing all records', function () {
         const browser = new Browser();
         login(browser, 'http://192.168.1.69:3000', 'kenzan')
             .then(function () {
-                assert.equal(browser.querySelectorAll('input[type=submit]').length, 0);
+                browser.assert.elements('input[type=submit]', 0);
                 done();
             })
     });
@@ -338,7 +339,7 @@ describe('Adding a new record', function () {
                 browser_sufficient.setCookie(cookie);
             });
             browser_sufficient.fill('[name=authenticity_token]', browser_insufficient.querySelector('[name=authenticity_token]').value);
-            emp = Helpers.newEmployee('post3');
+            emp = Helpers.newEmployee('post1');
             for (let key in emp)
                 if (key !== 'bStatus' && key !== 'password')
                     browser_sufficient.fill('[id=employee_' + key + ']', emp[key]);
@@ -354,6 +355,39 @@ describe('Adding a new record', function () {
             done();
         });
     });
+
+    it('should save all field data if there is a save error', function (done) {
+        const browser = new Browser();
+        const emp = Helpers.newEmployee('add2');
+        login(browser, 'http://192.168.1.69:3000/employees/new', 'kenzanadu')
+            .then(function () {
+                for (let key in emp)
+                    if (key !== 'bStatus')
+                        browser.fill('[id=employee_' + key + ']', emp[key]);
+                browser.fill('[id=employee_username]', '');
+                return browser.pressButton('[name=commit]');
+            }).then(function () {
+                for (let key in emp) {
+                    if (key !== 'bStatus' && key !== 'password' && key !== 'username')
+                        if (key.indexOf('date') > -1)
+                            assert.ok(LocalDate.parse(browser.querySelector('[id=employee_' + key + ']').value).equals(emp[key]));
+                        else
+                            assert.equal(browser.querySelector('[id=employee_' + key + ']').value, emp[key]);
+                }
+                browser.fill('[id=employee_username]', emp.username);
+                browser.fill('[id=employee_dateOfBirth]', '');
+                return browser.pressButton('[name=commit]');
+            }).then(function () {
+                for (let key in emp) {
+                    if (key !== 'bStatus' && key !== 'password' && key !== 'dateOfBirth')
+                        if (key.indexOf('date') > -1)
+                            assert.ok(LocalDate.parse(browser.querySelector('[id=employee_' + key + ']').value).equals(emp[key]));
+                        else
+                            assert.equal(browser.querySelector('[id=employee_' + key + ']').value, emp[key]);
+                }
+                done();
+        })
+    })
 });
 
 describe('Updating a record', function () {
@@ -401,32 +435,153 @@ describe('Updating a record', function () {
             assert.ok(false);
         });
     });
-    it.skip('should retain all new data in all fields if there is a save error', function (done) {
+
+    it('should retain all new data in all fields if there is a save error', function (done) {
+        const browser = new Browser();
+        const emp = Helpers.newEmployee('add3');
+        const emp2 = Helpers.newEmployee('add4');
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        restclient.login('kenzana', 'kenzan')
+            .then(() => restclient.addEmployee(emp))
+            .then((saved_emp) =>login(browser, 'http://192.168.1.69:3000/employees/' + saved_emp.id + '/edit', 'kenzanadu'))
+            .then(function () {
+                for (let key in emp2)
+                    if (key !== 'bStatus')
+                        browser.fill('[id=employee_' + key + ']', emp2[key]);
+                browser.fill('[id=employee_username]', '');
+                return browser.pressButton('[name=commit]');
+            }).then(function () {
+            for (let key in emp2) {
+                if (key !== 'bStatus' && key !== 'password' && key !== 'username')
+                    if (key.indexOf('date') > -1)
+                        assert.ok(LocalDate.parse(browser.querySelector('[id=employee_' + key + ']').value).equals(emp2[key]));
+                    else
+                        assert.equal(browser.querySelector('[id=employee_' + key + ']').value, emp2[key]);
+            }
+            browser.fill('[id=employee_username]', emp2.username);
+            browser.fill('[id=employee_dateOfBirth]', '');
+            return browser.pressButton('[name=commit]');
+        }).then(function () {
+            for (let key in emp2) {
+                if (key !== 'bStatus' && key !== 'password' && key !== 'dateOfBirth')
+                    if (key.indexOf('date') > -1)
+                        assert.ok(LocalDate.parse(browser.querySelector('[id=employee_' + key + ']').value).equals(emp2[key]));
+                    else
+                        assert.equal(browser.querySelector('[id=employee_' + key + ']').value, emp2[key]);
+            }
+            done();
+        })
     });
-    it.skip('should not have password if user does not have authority', function (done) {
+
+    //
+    // These test for:
+    //   The presence of password if user has authority
+    //   The lack of presence if user does not
+    //   The presence of the roles if user has authority
+    //   The lack of presence if user does not
+    //   That the password field does not have any contents
+    //
+    it('should not have password if user does not have authority', function (done) {
+        var browser = new Browser();
+        getId('kenzanp')
+            .then((id) => login(browser, 'http://192.168.1.69:3000/employees/' + id + '/edit', 'kenzanu'))
+            .then(function(){
+                browser.assert.elements('[id=employee_password]', 0);
+                browser.assert.elements('[id=employee_role]', 0);
+            });
+
     });
-    it.skip('should have password if user has authority', function (done) {
+
+    it('should have password if user has authority', function (done) {
+        var browser = new Browser();
+        getId('kenzanp')
+            .then((id) => login(browser, 'http://192.168.1.69:3000/employees/' + id + '/edit', 'kenzanu'))
+            .then(function(){
+                browser.assert.element('[id=employee_password]');
+                browser.assert.element('[id=employee_role]');
+                assert.equal('', browser.querySelector('[id=employee_password]'), '');
+            });
+
     });
-    it.skip('should not have roles if user does not have authority', function (done) {
+
+    it('should not change the password if password field is not filled in', function (done) {
+        const browser = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        var emp = Helpers.newEmployee('pw1');
+        restclient.login('kenzanp', 'kenzan')
+            .then(() => restclient.addEmployee(emp))
+            .then((data) => {emp.id = data.id ; return restclient.setPassword(emp.username, 'initialpassword')})
+            .then(() => login(browser, 'http://192.168.1.69:3000/employees/' + emp.id + '/edit', 'kenzanp'))
+            .then(function() {
+                browser.fill('[id=employee_email]', 'bull@bull.com');
+                return browser.pressButton('[name=commit]');
+            }).then(() => logout(browser))
+            .then(() => login(browser, 'http://192.168.1.69:3000/', emp.username, 'initialpassword'))
+            .then(function(){
+                browser.assert.attribute('div [id=test_automation]', 'name', 'Employee#index');
+                done();
+            });
     });
-    it.skip('should have roles if user has authority', function (done) {
+
+    it('should change the password if password field is filled in', function (done) {
+        const browser = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        var emp = Helpers.newEmployee('pw1');
+        restclient.login('kenzanp', 'kenzan')
+            .then(() => restclient.addEmployee(emp))
+            .then((data) => {emp.id = data.id ; return restclient.setPassword(emp.username, 'initialpassword')})
+            .then(() => login(browser, 'http://192.168.1.69:3000/employees/' + emp.id + '/edit', 'kenzanp'))
+            .then(function() {
+                browser.fill('[id=employee_email]', 'bull@bull.com');
+                browser.fill('[id=employee_password]', 'supersecretnewpassword');
+                return browser.pressButton('[name=commit]');
+            }).then(() => logout(browser))
+            .then(() => login(browser, 'http://192.168.1.69:3000/', emp.username, 'supersecretnewpassword'))
+            .then(function(){
+                browser.assert.attribute('div [id=test_automation]', 'name', 'Employee#index');
+                done();
+            });
     });
-    it.skip('should never display anything in the password field', function (done) {
+
+    it.only('should change the other input fields appropriately', function (done) {
+        //this.timeout(100000);
+        const emp1 = Helpers.newEmployee('change1');
+        const emp2 = Helpers.newEmployee('change2');
+        const browser = new Browser();
+        const restclient = new RestClient('http://192.168.1.69:3000/rest', 'promises');
+        let promises = [];
+        promises.push(() => login(browser, 'http://192.168.1.69:3000', 'kenzanu'));
+        promises.push(() => restclient.login('kenzana', 'kenzan'));
+        promises.push(() => restclient.addEmployee(emp1));
+        promises.push((data) => {emp1.id = emp2.id = data.id; return Promises.resolve();});
+        for(let key in emp2) {
+            promises.push(() => browser.visit('http://192.168.1.69:3000/employees/' + emp1.id + '/edit'));
+            promises.push(() => {
+                browser.fill('[id=employee_' + key + ']', emp2[key]);
+                return browser.pressButton('[name=commit]')
+            });
+            promises.push(() => restclient.getEmployee(emp1.id));
+            promises.push((changed_emp) => {
+                assert.equal(changed_emp[key], emp2[key], 'Edit did not properly change the ' + key + ' field');
+                return Promise.resolve();
+            });
+        }
+        promises.push(() => done());
+        PSEQ(promises);
     });
-    it.skip('should not change the password if password field is not filled in', function (done) {
-    });
-    it.skip('should change the password if password field is filled in', function (done) {
-    });
-    it.skip('should change the other input fields appropriately', function (done) {
-    });
+
     it.skip('should delete the optional fields appropriately', function (done) {
     });
+
     it.skip('should only allow valid dates in the date fields', function (done) {
     });
+
     it.skip('should have the delete link if user has delete authority', function (done) {
     });
+
     it.skip('should not have the delete link if user does not have delete authority', function (done) {
     });
+
     it('should not work with a direct post if user does not have privileges', function (done) {
         const browser_sufficient = new Browser();
         const browser_insufficient = new Browser();

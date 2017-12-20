@@ -24,9 +24,10 @@
   "homepage": "https://github.com/djlogan2/kenzan_node#readme",
   "devDependencies": {
     "mocha": "^4.0.1",
-    "selenium-webdriver": "^3.6.0",
     "node-rest-client": "^3.1.0",
     "nodemon": "^1.12.1",
+    "promise-sequential": "^1.1.1",
+    "selenium-webdriver": "^3.6.0",
     "zombie": "^5.0.7"
   },
   "dependencies": {

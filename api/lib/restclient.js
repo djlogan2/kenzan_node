@@ -22,11 +22,11 @@ const validParser = {
                 }
 
                 if(parsedData) {
-                    if (parsedData.dateOfBirth /*"dateOfBirth" in parsedData*/) {
+                    if (parsedData.dateOfBirth) {
                         parsedData.dateOfBirth = LocalDate.parse(parsedData.dateOfBirth);
                     }
 
-                    if (parsedData.dateOfEmployment /*"dateOfEmployment" in parsedData*/) {
+                    if (parsedData.dateOfEmployment) {
                         parsedData.dateOfEmployment = LocalDate.parse(parsedData.dateOfEmployment);
                     }
                 }
